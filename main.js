@@ -16,6 +16,7 @@ const {
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+const TIME = require('./shared/time'); // 기다리는 시간·날짜 계산은 렌더러와 같은 값을 쓴다
 
 // 트레이에 며칠씩 상주하는 앱이라 예외 하나로 통째로 죽으면 사용자는 이유도 모르고
 // 마스코트를 잃는다. 기록만 남기고 버틴다 — Node 는 처리되지 않은 rejection 도
@@ -37,7 +38,7 @@ const DEFAULT_CONFIG = {
   height: 260,
   margin: 24,          // 화면 모서리로부터 여백
   corner: 'bottom-right', // bottom-right | bottom-left | top-right | top-left
-  idleSleepMs: 90000,  // 이 시간 동안 이벤트 없으면 잠자기
+  idleSleepMs: 90 * TIME.SEC, // 이 시간 동안 이벤트 없으면 잠자기
   guideTitle: '컨퍼런스 안내',
   guideSubtitle: '오늘의 세션',
   guideWidth: 320,
@@ -100,7 +101,6 @@ let lastDir = -1;           // 바라보는 방향(-1 왼쪽, +1 오른쪽)
 let workingUntil = 0;       // 이 시각까지 코딩중으로 간주
 let returnTimer = null;
 const WALK_SPEED = 4;       // 틱당 이동 px
-const WALK_TICK = 33;       // ~30fps
 
 // ---------------------------------------------------------------------------
 // 창 위치 계산
@@ -195,8 +195,6 @@ function createWindow() {
 // ---------------------------------------------------------------------------
 // show/hide 이벤트는 showInactive()·hide() 로 여닫을 때 오지 않아 믿을 수 없다.
 // 값이 정확한 isVisible() 을 주기적으로 들여다본다.
-const HIDDEN_DESTROY_MS = 5 * 60000;
-const HIDDEN_SWEEP_MS = 30000;
 const hiddenSince = new Map();
 let hiddenSweeper = null;
 
@@ -210,7 +208,7 @@ function sweepHiddenWindows() {
     const since = hiddenSince.get(w);
     if (since == null) {
       hiddenSince.set(w, Date.now());
-    } else if (Date.now() - since >= HIDDEN_DESTROY_MS) {
+    } else if (Date.now() - since >= TIME.HIDDEN_DESTROY_MS) {
       hiddenSince.delete(w);
       w.destroy(); // 참조는 'closed' 에서 비운다
     }
@@ -330,19 +328,15 @@ function loadConference() {
   return {};
 }
 
-// 자정 기준 날짜 비교로 phase 결정
-function startOfDay(dateStr) {
-  const d = dateStr ? new Date(dateStr) : new Date();
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
 function effNow() {
   return mockNow != null ? mockNow : Date.now();
 }
+// 자정 기준 날짜 비교로 phase 결정
 function conferencePhase(conf) {
   if (overridePhase) return overridePhase;
-  const start = startOfDay(conf.startDate || conf.date);
-  const end = startOfDay(conf.endDate || conf.startDate || conf.date);
-  const today = startOfDay(new Date(effNow()));
+  const start = TIME.startOfDay(conf.startDate || conf.date);
+  const end = TIME.startOfDay(conf.endDate || conf.startDate || conf.date);
+  const today = TIME.startOfDay(effNow());
   if (isNaN(start)) return 'dayof';
   if (today < start) return 'before';
   if (today > end) return 'after';
@@ -479,7 +473,7 @@ function oppositeCorner(corner) {
 }
 
 function startMover() {
-  if (!mover) mover = setInterval(stepWalk, WALK_TICK);
+  if (!mover) mover = setInterval(stepWalk, TIME.WALK_TICK_MS);
 }
 function stopMover() {
   if (mover) {
@@ -521,7 +515,8 @@ function onArrive() {
   }
 }
 function startCodingWalk(data = {}) {
-  const linger = Number(data.lingerMs || data.ttl) || 6000; // 웹훅이 문자열을 보내도 숫자로
+  // 웹훅이 문자열을 보내도 숫자로
+  const linger = Number(data.lingerMs || data.ttl) || TIME.WALK_LINGER_MS;
   workingUntil = Date.now() + linger;
   if (walkGoal !== 'away') {
     walkGoal = 'away';
@@ -547,11 +542,8 @@ function returnHome() {
 // ---------------------------------------------------------------------------
 const WANDER_STEPS = 3; // 한 번 나설 때 걷는 걸음 수
 const WANDER_STEP_PX = 14; // 한 걸음에 이동하는 거리
-const WANDER_STEP_MS = 600; // 한 걸음을 걷는 시간
-const WANDER_GAP_MS = 1670; // 걸음 시작 간격 — 3걸음이 약 5초
-const WANDER_MIN_MS = 25000; // 다음 산책까지 대기(최소~최대)
-const WANDER_MAX_MS = 50000;
 const WANDER_RANGE_PX = 90; // 기준점에서 벗어날 수 있는 최대 거리
+// 걸음에 걸리는 시간과 산책 간격은 shared/time.js (WANDER_*)
 
 let wanderTimer = null; // 다음 산책 예약
 let wanderStepTimer = null; // 다음 걸음 예약
@@ -576,7 +568,7 @@ function scheduleWander() {
   if (wanderTimer) clearTimeout(wanderTimer);
   wanderTimer = setTimeout(
     startWander,
-    WANDER_MIN_MS + Math.random() * (WANDER_MAX_MS - WANDER_MIN_MS)
+    TIME.WANDER_MIN_MS + Math.random() * (TIME.WANDER_MAX_MS - TIME.WANDER_MIN_MS)
   );
 }
 // 오갈 수 있는 x 범위 — 화면 여백과 기준점 반경 중 좁은 쪽
@@ -616,7 +608,7 @@ function takeStep(dir, left, b) {
   lastDir = dir;
   sendToMascot('mascot:state', { state: 'walking', dir });
 
-  const ticks = Math.max(1, Math.round(WANDER_STEP_MS / WALK_TICK));
+  const ticks = Math.max(1, Math.round(TIME.WANDER_STEP_MS / TIME.WALK_TICK_MS));
   let n = 0;
   wanderMover = setInterval(() => {
     if (!win || win.isDestroyed() || wanderBusy()) {
@@ -633,11 +625,11 @@ function takeStep(dir, left, b) {
       if (left > 1) {
         wanderStepTimer = setTimeout(
           () => takeStep(dir, left - 1, b),
-          WANDER_GAP_MS - WANDER_STEP_MS
+          TIME.WANDER_GAP_MS - TIME.WANDER_STEP_MS
         );
       }
     }
-  }, WALK_TICK);
+  }, TIME.WALK_TICK_MS);
 }
 
 // 외부에서 들어온 활동/알림을 처리하는 공통 함수
@@ -664,7 +656,7 @@ function showSystemNotification(data = {}) {
     release();
   });
   note.once('close', release);
-  setTimeout(release, 60000);
+  setTimeout(release, TIME.NOTIFICATION_RELEASE_MS);
   note.show();
 }
 
@@ -706,10 +698,8 @@ const VITALS = {
 const VITAL_ORDER = ['LCP', 'INP', 'CLS', 'FCP', 'TTFB'];
 const GRADE_RANK = { good: 0, ni: 1, poor: 2 };
 
-// 같은 평가가 반복될 땐 조용히, 평가가 바뀌었을 땐 빠르게 알려준다.
+// 같은 평가가 반복될 땐 조용히, 평가가 바뀌었을 땐 빠르게 알려준다(VITALS_GAP_*).
 // 저장할 때마다 페이지가 새로고침되는 dev 환경에선 이 간격이 없으면 말풍선만 뜬다.
-const VITALS_GAP_SAME_MS = 60000;
-const VITALS_GAP_CHANGED_MS = 6000;
 let lastVitalsGrade = null;
 let lastVitalsAt = 0;
 
@@ -750,7 +740,7 @@ function handleVitals(payload = {}) {
   // 평가가 그대로면 한동안 다시 말 걸지 않는다
   const changed = overall !== lastVitalsGrade;
   const gap = Date.now() - lastVitalsAt;
-  if (gap < (changed ? VITALS_GAP_CHANGED_MS : VITALS_GAP_SAME_MS)) {
+  if (gap < (changed ? TIME.VITALS_GAP_CHANGED_MS : TIME.VITALS_GAP_SAME_MS)) {
     return { ok: true, grade: overall, summary, skipped: 'throttled' };
   }
   lastVitalsGrade = overall;
@@ -956,27 +946,59 @@ function startServer() {
 // ---------------------------------------------------------------------------
 // 컨퍼런스 세션 스케줄
 // ---------------------------------------------------------------------------
-function loadSchedule() {
-  const p = path.join(__dirname, 'schedule.json');
-  try {
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
-  } catch (e) {
-    console.error('[schedule] 읽기 실패:', e.message);
-  }
-  return [];
+// 세션에는 "13:00" 처럼 시:분만 적는다 — 날짜는 conference.json 의 행사 날짜에서
+// 물려받으므로, 행사 날짜 한 줄만 고치면 스케줄이 통째로 따라온다. 여러 날 행사면
+// day: 2 로 며칠째인지 적는다. 예전처럼 전체 날짜를 적어두면 그 날짜를 그대로 쓴다.
+function resolveSessionTime(item, conf) {
+  const raw = String(item.time || '').trim();
+  if (!raw) return NaN;
+  if (!/^\d{1,2}:\d{2}$/.test(raw)) return new Date(raw).getTime();
+
+  const base = TIME.startOfDay(conf.startDate || conf.date);
+  if (isNaN(base)) return NaN;
+  const [h, m] = raw.split(':').map(Number);
+  const d = new Date(base);
+  d.setDate(d.getDate() + Math.max(0, (Number(item.day) || 1) - 1));
+  d.setHours(h, m, 0, 0);
+  return d.getTime();
 }
 
-// setTimeout 은 약 24.8일(2^31-1 ms)이 넘는 지연을 받으면 오버플로로 즉시 실행된다.
-// 컨퍼런스 일정은 몇 주 뒤가 흔해서 그대로 두면 앱을 켜자마자 알림이 쏟아진다.
-const MAX_TIMEOUT_MS = 2147483647;
+// 시각을 여기서 한 번 확정해, 알림 예약과 두 패널이 모두 같은 절대 시각을 본다.
+function loadSchedule() {
+  const p = path.join(__dirname, 'schedule.json');
+  let raw = [];
+  try {
+    if (fs.existsSync(p)) raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (e) {
+    console.error('[schedule] 읽기 실패:', e.message);
+    return [];
+  }
+  if (!Array.isArray(raw)) return [];
 
+  const conf = loadConference();
+  return raw
+    .map((it) => {
+      const at = resolveSessionTime(it, conf);
+      if (isNaN(at)) {
+        // 조용히 사라지면 왜 알림이 안 오는지 알 수 없다
+        console.error('[schedule] 시각을 읽을 수 없어 건너뜀:', JSON.stringify(it.time));
+        return null;
+      }
+      return { ...it, time: new Date(at).toISOString() };
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(a.time) - new Date(b.time));
+}
+
+// setTimeout 은 약 24.8일(MAX_TIMEOUT_MS)이 넘는 지연을 받으면 오버플로로 즉시 실행된다.
+// 컨퍼런스 일정은 몇 주 뒤가 흔해서 그대로 두면 앱을 켜자마자 알림이 쏟아진다.
 function scheduleAt(delay, fn) {
   const ref = { handle: null };
   const arm = (remaining) => {
-    if (remaining <= MAX_TIMEOUT_MS) {
+    if (remaining <= TIME.MAX_TIMEOUT_MS) {
       ref.handle = setTimeout(fn, remaining);
     } else {
-      ref.handle = setTimeout(() => arm(remaining - MAX_TIMEOUT_MS), MAX_TIMEOUT_MS);
+      ref.handle = setTimeout(() => arm(remaining - TIME.MAX_TIMEOUT_MS), TIME.MAX_TIMEOUT_MS);
     }
   };
   arm(delay);
@@ -996,8 +1018,8 @@ function armSchedule() {
   for (const it of items) {
     const t = new Date(it.time).getTime();
     if (isNaN(t)) continue;
-    // 세션 시작 leadMinutes(기본 5분) 전에 알림
-    const lead = (it.leadMinutes != null ? it.leadMinutes : 5) * 60000;
+    // 세션 시작 leadMinutes(기본 DEFAULT_LEAD_MIN) 전에 알림
+    const lead = (it.leadMinutes != null ? it.leadMinutes : TIME.DEFAULT_LEAD_MIN) * TIME.MIN;
     const fireAt = t - lead;
     const delay = fireAt - now;
     if (delay <= 0) continue; // 이미 지난 건 무시
@@ -1237,7 +1259,7 @@ app.whenReady().then(() => {
   armSchedule();
   scheduleSleep();
   scheduleWander();
-  hiddenSweeper = setInterval(sweepHiddenWindows, HIDDEN_SWEEP_MS);
+  hiddenSweeper = setInterval(sweepHiddenWindows, TIME.HIDDEN_SWEEP_MS);
 
   // 전역 단축키
   globalShortcut.register('CommandOrControl+Shift+M', () => {
@@ -1267,7 +1289,7 @@ app.whenReady().then(() => {
   });
 
   // 첫 인사
-  setTimeout(() => handleEvent('state', { state: 'greet' }), 800);
+  setTimeout(() => handleEvent('state', { state: 'greet' }), TIME.FIRST_GREET_MS);
 });
 
 app.on('window-all-closed', () => {

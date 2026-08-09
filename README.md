@@ -239,8 +239,9 @@ curl -X POST localhost:7842/vitals \
 ```json
 {
   "name": "우리 컨퍼런스 2026",
-  "startDate": "2026-09-20",
-  "endDate": "2026-09-20",
+  "shortName": "FECONF",
+  "startDate": "2026-10-10",
+  "endDate": "2026-10-10",
   "venue": "코엑스 그랜드볼룸 (3층)",
   "address": "서울 강남구 영동대로 513",
   "discord": { "url": "https://discord.gg/...", "note": "공지·네트워킹 채널" },
@@ -248,6 +249,8 @@ curl -X POST localhost:7842/vitals \
   "reviewNote": "1분이면 끝나요 🙌"
 }
 ```
+
+**행사 날짜는 여기가 유일한 출처입니다.** `startDate` 한 줄만 고치면 D-day·안내 패널·세션 알림 시각이 모두 따라옵니다. `shortName` 은 마스코트 클릭 시 뜨는 D-day 팝업 문구(`FECONF까지 D-62`)에 쓰이고, 없으면 `name` 을 씁니다.
 
 `before`/`after`에서 Discord 카드와 후기 버튼을 누르면 기본 브라우저로 링크가 열립니다.
 
@@ -271,9 +274,19 @@ curl -X POST localhost:7842/vitals \
 
 [schedule.json](schedule.json) 에 세션을 넣으면 `leadMinutes` 전에 자동 알림이 뜹니다. 트레이 메뉴 → "🗓 스케줄 다시 로드" 로 재적용.
 
+`time` 에는 **시:분만** 적습니다. 날짜는 `conference.json` 의 행사 날짜에서 물려받으므로, 행사가 미뤄져도 스케줄은 손대지 않아도 됩니다.
+
 ```json
-{ "time": "2026-07-01T14:30:00", "leadMinutes": 10, "title": "AI 세션", "message": "곧 시작!", "level": "success" }
+{ "time": "14:30", "leadMinutes": 10, "title": "AI 세션", "message": "곧 시작!", "level": "success" }
 ```
+
+| 필드 | 뜻 |
+| --- | --- |
+| `time` | 세션 시작 시각 `"14:30"`. 전체 날짜(`"2026-10-10T14:30:00"`)를 적으면 그 날짜를 그대로 씁니다 |
+| `day` | 여러 날 행사에서 며칠째인지 (생략하면 1일차) |
+| `leadMinutes` | 몇 분 전에 알릴지 (생략하면 5분) |
+
+이미 지난 세션은 예약하지 않습니다.
 
 ## 설정 (선택)
 

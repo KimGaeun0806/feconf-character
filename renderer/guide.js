@@ -23,11 +23,7 @@ function simNow() {
 }
 
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
-const pad = (n) => String(n).padStart(2, '0');
-const hhmm = (ts) => {
-  const d = new Date(ts);
-  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-};
+const { pad, hhmm, startOfDay } = TIME; // shared/time.js
 
 function el(tag, cls, text) {
   const e = document.createElement(tag);
@@ -55,10 +51,6 @@ function iconEl(name, cls) {
   return span;
 }
 
-function startOfDay(ds) {
-  const d = ds != null ? new Date(ds) : new Date();
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
 function fmtDate(ds) {
   const d = new Date(ds);
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} (${WD[d.getDay()]})`;
@@ -71,11 +63,10 @@ function dateRange(conf) {
   return `${fmtDate(s)} ~ ${fmtDate(e)}`;
 }
 function ddayCount(conf) {
-  const start = startOfDay(conf.startDate || conf.date);
-  return Math.round((start - startOfDay(simNow())) / 86400000);
+  return TIME.daysUntil(simNow(), conf.startDate || conf.date);
 }
 function fmtEta(ms) {
-  const min = Math.round(ms / 60000);
+  const min = Math.round(ms / TIME.MIN);
   if (min <= 0) return '지금';
   if (min < 60) return `${min}분 후`;
   const h = Math.floor(min / 60);
@@ -84,10 +75,10 @@ function fmtEta(ms) {
 }
 function statusOf(item, now) {
   const t = new Date(item.time).getTime();
-  const lead = (item.leadMinutes != null ? item.leadMinutes : 5) * 60000;
+  const lead = (item.leadMinutes != null ? item.leadMinutes : TIME.DEFAULT_LEAD_MIN) * TIME.MIN;
   if (now >= t) return { key: 'done', label: '종료' };
   if (now >= t - lead) return { key: 'soon', label: '곧 시작' };
-  if (now >= t - 30 * 60000) return { key: 'upcoming', label: '예정' };
+  if (now >= t - TIME.SESSION_UPCOMING_MS) return { key: 'upcoming', label: '예정' };
   return { key: 'scheduled', label: '예정' };
 }
 
@@ -292,7 +283,7 @@ refresh();
 // 패널은 대부분 숨겨져 있다 — 보이지 않는 동안 DOM 을 다시 그릴 이유가 없다
 setInterval(() => {
   if (!document.hidden) tickClock();
-}, 1000);
+}, TIME.GUIDE_CLOCK_MS);
 setInterval(() => {
   if (!document.hidden) render();
-}, 15000);
+}, TIME.GUIDE_RENDER_MS);

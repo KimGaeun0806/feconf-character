@@ -337,8 +337,8 @@ function setTemp(state, ttl) {
 // 일회성 감정은 애니메이션 길이만큼 재생
 function defaultTtl(state) {
   const a = ANIM[state];
-  if (!a || !animsRaw) return 2000;
-  if (a.loop) return 3000;
+  if (!a || !animsRaw) return TIME.TEMP_FALLBACK_MS;
+  if (a.loop) return TIME.TEMP_LOOP_MS;
   const data = animData(a.file);
   const n = data ? data.pages.length : 8;
   return (n / a.fps) * 1000 + 120;
@@ -374,10 +374,10 @@ function drawCat(now) {
   // idle 로 가만히 있으면 가끔 두리번(갸웃)/빼꼼
   // (앱을 켜자마자 첫 프레임에 걸리지 않게, 처음 한 번은 시간을 벌어둔다)
   if (state !== 'idle' || nextQuirk < 0) {
-    nextQuirk = now + 8000;
+    nextQuirk = now + TIME.QUIRK_AFTER_MS;
   } else if (now > nextQuirk) {
     setTemp(Math.random() < 0.6 ? 'curious' : 'peek');
-    nextQuirk = now + 9000 + Math.random() * 10000;
+    nextQuirk = now + TIME.QUIRK_MIN_MS + Math.random() * TIME.QUIRK_SPREAD_MS;
   }
 
   const a = ANIM[state] || ANIM.idle;
@@ -426,7 +426,7 @@ function showBubble({ title, message, level, duration, react = true, reaction })
       clickBubble.classList.add('hidden');
       clickBubble.classList.remove('closing');
       showBubble({ title, message, level, duration, react, reaction });
-    }, 160);
+    }, TIME.BUBBLE_CLOSE_MS);
     return;
   }
 
@@ -440,20 +440,20 @@ function showBubble({ title, message, level, duration, react = true, reaction })
   void bubble.offsetWidth;
 
   if (bubbleTimer) clearTimeout(bubbleTimer);
-  const dur = duration || (level === 'urgent' ? 12000 : 6500);
+  const dur = duration || (level === 'urgent' ? TIME.BUBBLE_URGENT_MS : TIME.BUBBLE_MS);
   bubbleTimer = setTimeout(hideBubble, dur);
 
   // 캐릭터 반응 — 성공/정보는 놀람→신남, 실패/경고는 계속 놀람 유지
   // (클릭 대화 버블은 이미 인사 중이라 react:false 로 건너뜀)
   if (react) {
-    setTemp('notify', 1600);
+    setTemp('notify', TIME.REACT_DELAY_MS);
     if (reaction && ANIM[reaction]) {
       // 보낸 쪽이 표정을 지정한 경우 (Web Vitals 결과 등)
-      setTimeout(() => setTemp(reaction, 3000), 1600);
+      setTimeout(() => setTemp(reaction, TIME.REACT_CUSTOM_MS), TIME.REACT_DELAY_MS);
     } else if (level === 'urgent' || level === 'warn') {
-      setTimeout(() => setTemp('notify', 2800), 1600);
+      setTimeout(() => setTemp('notify', TIME.REACT_HOLD_MS), TIME.REACT_DELAY_MS);
     } else {
-      setTimeout(() => setTemp('happy', 1800), 1600);
+      setTimeout(() => setTemp('happy', TIME.REACT_HAPPY_MS), TIME.REACT_DELAY_MS);
     }
   }
   releaseMouseIfIdle(); // 직전 팝업을 닫으며 잡은 마우스가 남아있으면 정리
@@ -539,25 +539,25 @@ if (cbClose) {
   });
 }
 
-function startOfDay(ts) {
-  const d = new Date(ts);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
 // "FECONF까지 D-XX" / 당일 "D-DAY" / 이후 "FECONF 종료ㅠㅠ"
+// 행사 이름은 conference.json 의 shortName(없으면 name)에서 가져온다.
 function setDdayContent(conf, now) {
   const s = conf.startDate || conf.date;
   if (!s) {
     cbDday.textContent = '';
     return;
   }
-  const diff = Math.round((startOfDay(new Date(s).getTime()) - startOfDay(now)) / 86400000);
-  if (diff > 0) {
-    cbDday.innerHTML = 'FECONF까지 <span class="dday-num">D-' + diff + '</span>';
-  } else if (diff === 0) {
-    cbDday.innerHTML = 'FECONF까지 <span class="dday-num">D-DAY</span>';
-  } else {
-    cbDday.textContent = 'FECONF 종료ㅠㅠ';
+  const label = conf.shortName || conf.name || '행사';
+  const diff = TIME.daysUntil(now, s);
+  if (diff < 0) {
+    cbDday.textContent = `${label} 종료ㅠㅠ`;
+    return;
   }
+  const num = document.createElement('span');
+  num.className = 'dday-num';
+  num.textContent = diff === 0 ? 'D-DAY' : `D-${diff}`;
+  cbDday.textContent = `${label}까지 `;
+  cbDday.appendChild(num);
 }
 async function toggleClickBubble() {
   if (!clickBubble.classList.contains('hidden')) {
@@ -646,13 +646,11 @@ const CHAT_LINES = [
   '오늘 하루도 수고했어 ✨',
   '두 번 클릭하면 컨퍼런스 안내를 보여줄게!',
 ];
-const CHAT_BUBBLE_MS = 3000;
-const DBLCLICK_MS = 250;
 let clickTimer = null;
 
 function showChatBubble() {
   const line = CHAT_LINES[Math.floor(Math.random() * CHAT_LINES.length)];
-  showBubble({ title: line, level: 'info', duration: CHAT_BUBBLE_MS, react: false });
+  showBubble({ title: line, level: 'info', duration: TIME.CHAT_BUBBLE_MS, react: false });
 }
 
 window.addEventListener('mouseup', () => {
@@ -674,7 +672,7 @@ window.addEventListener('mouseup', () => {
       clickTimer = setTimeout(() => {
         clickTimer = null;
         showChatBubble();
-      }, DBLCLICK_MS);
+      }, TIME.DBLCLICK_MS);
     }
     if (window.mascot) window.mascot.click();
   }
@@ -688,12 +686,10 @@ window.addEventListener('mouseup', () => {
 // ===========================================================================
 // 항상 떠 있는 창이라 브라우저가 rAF 를 줄여주지 않아 120Hz 화면에서는 초당 120번
 // 깨어난다. 캐릭터 애니메이션은 최대 10fps 라 필요한 만큼만 타이머로 깨운다.
-const DRAW_FPS_CAP = 30;
-
 function drawInterval() {
   const a = ANIM[effectiveState()] || ANIM.idle;
   // idle 은 프레임이 한 장이지만 사인 바운스가 있어 최소한의 갱신은 필요하다
-  return 1000 / Math.min(DRAW_FPS_CAP, Math.max(a.fps || 0, 10));
+  return TIME.SEC / Math.min(TIME.DRAW_FPS_CAP, Math.max(a.fps || 0, TIME.DRAW_FPS_MIN));
 }
 
 function tick() {

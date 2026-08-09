@@ -8,19 +8,14 @@ let curPhase = ''; // '' = 자동(날짜 기반)
 let curMock = null; // ms 또는 null(실시간)
 
 const $ = (id) => document.getElementById(id);
-const pad = (n) => String(n).padStart(2, '0');
+const { pad, startOfDay } = TIME; // shared/time.js
 
-function startOfDayMs(ms) {
-  const d = new Date(ms);
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
-}
 function toDTLocal(ms) {
   const d = new Date(ms);
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 function confDayStart() {
-  const s = conf.startDate || conf.date;
-  return s ? startOfDayMs(new Date(s).getTime()) : startOfDayMs(Date.now());
+  return startOfDay(conf.startDate || conf.date);
 }
 
 async function init() {
@@ -36,20 +31,20 @@ async function init() {
 
 function buildChips() {
   const ds = confDayStart();
-  const de = startOfDayMs(new Date(conf.endDate || conf.startDate || Date.now()).getTime());
+  const de = startOfDay(conf.endDate || conf.startDate);
   const chips = [
-    ['📅 3일 전', ds - 3 * 86400000 + 10 * 3600000],
-    ['🌅 당일 09:00', ds + 9 * 3600000],
+    ['📅 3일 전', ds - 3 * TIME.DAY + 10 * TIME.HOUR],
+    ['🌅 당일 09:00', ds + 9 * TIME.HOUR],
   ];
   if (items.length) {
     const sorted = [...items].sort((a, b) => new Date(a.time) - new Date(b.time));
     const first = new Date(sorted[0].time).getTime();
     const last = new Date(sorted[sorted.length - 1].time).getTime();
-    chips.push(['⏰ 첫 세션 직전', first - 3 * 60000]);
-    chips.push(['🎤 세션 진행 중', first + 20 * 60000]);
+    chips.push(['⏰ 첫 세션 직전', first - 3 * TIME.MIN]);
+    chips.push(['🎤 세션 진행 중', first + 20 * TIME.MIN]);
     chips.push(['🎉 마지막 일정', last]);
   }
-  chips.push(['🌙 다음날', de + 86400000 + 10 * 3600000]);
+  chips.push(['🌙 다음날', de + TIME.DAY + 10 * TIME.HOUR]);
 
   const wrap = $('chips');
   wrap.innerHTML = '';
@@ -115,8 +110,8 @@ $('dt').addEventListener('change', () => {
 
 $('slider').addEventListener('input', () => {
   const mins = parseInt($('slider').value, 10);
-  const base = curMock != null ? startOfDayMs(curMock) : startOfDayMs(Date.now());
-  curMock = base + mins * 60000;
+  const base = startOfDay(curMock != null ? curMock : Date.now());
+  curMock = base + mins * TIME.MIN;
   $('time-label').textContent = `${pad(Math.floor(mins / 60))}:${pad(mins % 60)}`;
   $('dt').value = toDTLocal(curMock);
   apply();
@@ -149,7 +144,7 @@ document.querySelectorAll('#snail-emotes .chip').forEach((b) => {
   b.addEventListener('click', () => {
     window.dev.setState(b.dataset.state); // ttl 없음 → 렌더러가 애니메이션 길이만큼 재생
     b.classList.add('flash');
-    setTimeout(() => b.classList.remove('flash'), 350);
+    setTimeout(() => b.classList.remove('flash'), TIME.DEV_FLASH_MS);
   });
 });
 
