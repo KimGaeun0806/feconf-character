@@ -355,7 +355,7 @@ function wakeThen(next) {
 // ===========================================================================
 let lastState = null;
 let stateStart = 0;
-let nextQuirk = 0; // idle 중 가끔 갸웃/빼꼼
+let nextQuirk = -1; // idle 중 가끔 갸웃/빼꼼 (-1 = 아직 예약 전)
 
 let lastSig = ''; // 마지막으로 그린 그림의 식별자
 
@@ -372,7 +372,8 @@ function drawCat(now) {
   }
 
   // idle 로 가만히 있으면 가끔 두리번(갸웃)/빼꼼
-  if (state !== 'idle') {
+  // (앱을 켜자마자 첫 프레임에 걸리지 않게, 처음 한 번은 시간을 벌어둔다)
+  if (state !== 'idle' || nextQuirk < 0) {
     nextQuirk = now + 8000;
   } else if (now > nextQuirk) {
     setTemp(Math.random() < 0.6 ? 'curious' : 'peek');
@@ -458,6 +459,11 @@ function showBubble({ title, message, level, duration, react = true, reaction })
   releaseMouseIfIdle(); // 직전 팝업을 닫으며 잡은 마우스가 남아있으면 정리
 }
 function hideBubble() {
+  // 클릭으로 먼저 닫으면 예약된 자동 숨김이 남아 엉뚱한 때에 다시 돈다
+  if (bubbleTimer) {
+    clearTimeout(bubbleTimer);
+    bubbleTimer = null;
+  }
   bubble.classList.add('hidden');
   releaseMouseIfIdle();
 }
@@ -519,13 +525,17 @@ if (window.mascot) {
 // ===========================================================================
 const clickBubble = document.getElementById('click-bubble');
 const cbDday = document.getElementById('cb-dday');
-const cbDiscord = document.getElementById('cb-discord');
 const cbClose = document.getElementById('cb-close');
+
+function hideClickBubble() {
+  clickBubble.classList.add('hidden');
+  releaseMouseIfIdle();
+}
+
 if (cbClose) {
   cbClose.addEventListener('click', (e) => {
     e.stopPropagation();
-    clickBubble.classList.add('hidden');
-    releaseMouseIfIdle();
+    hideClickBubble();
   });
 }
 
@@ -551,8 +561,7 @@ function setDdayContent(conf, now) {
 }
 async function toggleClickBubble() {
   if (!clickBubble.classList.contains('hidden')) {
-    clickBubble.classList.add('hidden');
-    releaseMouseIfIdle();
+    hideClickBubble();
     return;
   }
   hideBubble(); // 대화 버블이 떠 있으면 안내창과 겹치지 않게 정리
@@ -563,28 +572,12 @@ async function toggleClickBubble() {
       if (d) data = d;
     } catch (_) {}
   }
-  const conf = data.conference || {};
-  setDdayContent(conf, data.now || Date.now());
-  if (cbDiscord) {
-    const url = conf.discord && conf.discord.url;
-    if (url) {
-      cbDiscord.style.display = '';
-      cbDiscord.onclick = (e) => {
-        e.stopPropagation();
-        if (window.mascot && window.mascot.openExternal) window.mascot.openExternal(url);
-      };
-    } else {
-      cbDiscord.style.display = 'none';
-    }
-  }
+  setDdayContent(data.conference || {}, data.now || Date.now());
   clickBubble.classList.remove('hidden');
   void clickBubble.offsetWidth; // pop 애니메이션 재생
 }
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') {
-    clickBubble.classList.add('hidden');
-    releaseMouseIfIdle();
-  }
+  if (e.key === 'Escape') hideClickBubble();
 });
 
 // ===========================================================================

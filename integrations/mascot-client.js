@@ -17,6 +17,8 @@ const TOKEN = process.env.MASCOT_TOKEN || '';
 // MASCOT_DISABLE=1 이면 전송을 완전히 끔
 const DISABLED = process.env.MASCOT_DISABLE === '1';
 
+// 응답을 받으면 { status, body }, 보내지 못했으면 false 로 resolve 한다.
+// 앱이 꺼져 있는 건 정상 상황이라 reject 하지 않는다 — 빌드를 멈추면 안 되니까.
 function post(pathName, payload) {
   return new Promise((resolve) => {
     if (DISABLED) return resolve(false);
@@ -35,8 +37,10 @@ function post(pathName, payload) {
         },
       },
       (res) => {
-        res.resume();
-        res.on('end', () => resolve(true));
+        let out = '';
+        res.setEncoding('utf8');
+        res.on('data', (d) => (out += d));
+        res.on('end', () => resolve({ status: res.statusCode, body: out }));
       }
     );
     // 앱이 안 떠 있으면 조용히 넘어감
@@ -87,4 +91,5 @@ function vitals(payload) {
   return post('/vitals', payload || {});
 }
 
-module.exports = { post, state, building, success, warn, fail, ready, vitals };
+// disabled: 전송을 끈 상태인지 — 못 보낸 것과 안 보낸 것을 구분해야 하는 쪽에서 쓴다
+module.exports = { post, state, building, success, warn, fail, ready, vitals, disabled: DISABLED };

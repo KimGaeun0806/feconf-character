@@ -50,23 +50,37 @@ function secs() {
 // 시작 알림 → 집중 상태
 m.building(name);
 
+// 알림이 나가기 전에 프로세스가 끝나면 이 도구는 존재 이유를 잃는다. success/fail 은
+// 상태 전환과 알림을 연달아 보내므로 왕복이 두 번이라 짧은 여유로는 모자란다.
+// 그렇다고 마스코트가 응답하지 않을 때 빌드 스크립트를 붙잡아 둘 수도 없어서,
+// 전송이 끝나거나 이 시간이 지나거나 먼저 오는 쪽을 따른다.
+const EXIT_GRACE_MS = 2000;
+
+function exitWhenSent(sending, code) {
+  let done = false;
+  const bye = () => {
+    if (done) return;
+    done = true;
+    process.exit(code);
+  };
+  sending.then(bye, bye);
+  setTimeout(bye, EXIT_GRACE_MS).unref();
+}
+
 const child = spawn(cmd[0], cmd.slice(1), { stdio: 'inherit', shell: process.platform === 'win32' });
 
 child.on('error', (err) => {
-  m.fail('실행 Fail...', `${cmd[0]}: ${err.message}`);
   console.error(`[mascot-watch] 실행 실패: ${err.message}`);
-  process.exit(1);
+  exitWhenSent(m.fail('실행 Fail...', `${cmd[0]}: ${err.message}`), 1);
 });
 
 child.on('exit', (code, signal) => {
   const dur = secs();
-  if (code === 0) {
-    m.success('⭐️ 야호~성공~🎵⭐️', `${name} · ${dur}`);
-  } else {
-    m.fail('작업 Fail...', `${name} · 종료코드 ${code != null ? code : signal} · ${dur}`);
-  }
-  // 전송이 나갈 짧은 여유 후 원래 종료 코드로 종료
-  setTimeout(() => process.exit(code == null ? 1 : code), 120);
+  const sending =
+    code === 0
+      ? m.success('⭐️ 야호~성공~🎵⭐️', `${name} · ${dur}`)
+      : m.fail('작업 Fail...', `${name} · 종료코드 ${code != null ? code : signal} · ${dur}`);
+  exitWhenSent(sending, code == null ? 1 : code);
 });
 
 // Ctrl+C 등은 자식에게 전달

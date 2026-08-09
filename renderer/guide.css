@@ -502,10 +502,6 @@ footer {
   flex: none;
 }
 
-.hidden {
-  display: none !important;
-}
-
 /* 모션 최소화 설정 존중 — 등장·펄스 애니메이션과 트랜지션 비활성화 */
 @media (prefers-reduced-motion: reduce) {
   *,

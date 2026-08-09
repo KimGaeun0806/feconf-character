@@ -13,7 +13,6 @@ contextBridge.exposeInMainWorld('mascot', {
   onDday: (cb) => ipcRenderer.on('mascot:dday', (_e, d) => cb(d)),
 
   // 렌더러 → 메인
-  getConfig: () => ipcRenderer.invoke('mascot:getConfig'),
   getAnims: () => ipcRenderer.invoke('mascot:getAnims'),
   dragStart: () => ipcRenderer.send('mascot:dragStart'),
   drag: (dx, dy) => ipcRenderer.send('mascot:drag', { dx, dy }),

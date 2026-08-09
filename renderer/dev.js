@@ -128,30 +128,22 @@ $('realtime').addEventListener('click', () => {
   apply();
 });
 
+// 한 줄에 놓인 버튼 중 하나만 켜지는 묶음 — 누른 것만 남기고 값을 넘긴다
+function segmented(selector, key, send) {
+  const buttons = document.querySelectorAll(selector);
+  buttons.forEach((b) => {
+    b.addEventListener('click', () => {
+      buttons.forEach((x) => x.classList.remove('on'));
+      b.classList.add('on');
+      send(b.dataset[key]);
+    });
+  });
+}
+
 // ---- 달팽이 상태/감정 ----
-document.querySelectorAll('#snail-base button').forEach((b) => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('#snail-base button').forEach((x) => x.classList.remove('on'));
-    b.classList.add('on');
-    window.dev.setState(b.dataset.state); // ttl 없음 → 지속 상태
-  });
-});
-
-document.querySelectorAll('#bubble-seg button').forEach((b) => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('#bubble-seg button').forEach((x) => x.classList.remove('on'));
-    b.classList.add('on');
-    window.dev.setBubble(b.dataset.bubble); // 적용 + 미리보기 말풍선 표시
-  });
-});
-
-document.querySelectorAll('#font-seg button').forEach((b) => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('#font-seg button').forEach((x) => x.classList.remove('on'));
-    b.classList.add('on');
-    window.dev.setFont(b.dataset.font); // 적용 + 미리보기 말풍선 표시
-  });
-});
+segmented('#snail-base button', 'state', (v) => window.dev.setState(v)); // ttl 없음 → 지속 상태
+segmented('#bubble-seg button', 'bubble', (v) => window.dev.setBubble(v)); // 적용 + 미리보기
+segmented('#font-seg button', 'font', (v) => window.dev.setFont(v)); // 적용 + 미리보기
 
 document.querySelectorAll('#snail-emotes .chip').forEach((b) => {
   b.addEventListener('click', () => {

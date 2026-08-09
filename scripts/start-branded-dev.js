@@ -99,9 +99,13 @@ try {
 }
 
 if (brandedApp) {
-  const health = spawnSync('curl', ['-fsS', `http://127.0.0.1:${PORT}/health`], {
-    stdio: 'ignore',
-  });
+  // --max-time 없이 물으면 포트만 열려 있고 응답이 없는 상대에게 무한정 매달려
+  // 아무 출력도 없이 실행이 멈춘다
+  const health = spawnSync(
+    'curl',
+    ['-fsS', '--connect-timeout', '1', '--max-time', '2', `http://127.0.0.1:${PORT}/health`],
+    { stdio: 'ignore' }
+  );
   if (health.status === 0) {
     console.log(`${APP_NAME} is already running on port ${PORT}.`);
     process.exit(0);
@@ -118,7 +122,6 @@ if (brandedApp) {
 
 const child = spawn(require('electron'), [ROOT, ...process.argv.slice(2)], {
   cwd: ROOT,
-  env: { ...process.env, ELECTRON_DEV_BRANDED: '1' },
   stdio: 'inherit',
 });
 

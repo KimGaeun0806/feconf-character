@@ -149,6 +149,13 @@ function clampWindowToScreen(w) {
   if (p.x !== x || p.y !== y) safeSetPosition(w, p.x, p.y);
 }
 
+// 마스코트·안내 패널·개발자 창이 모두 같은 브리지를 쓴다
+const WEB_PREFS = {
+  preload: path.join(__dirname, 'preload.js'),
+  contextIsolation: true,
+  nodeIntegration: false,
+};
+
 function createWindow() {
   const { x, y } = cornerPosition();
   win = new BrowserWindow({
@@ -165,11 +172,7 @@ function createWindow() {
     fullscreenable: false,
     focusable: true,
     icon: appIcon(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    webPreferences: WEB_PREFS,
   });
 
   win.setAlwaysOnTop(true, 'screen-saver');
@@ -230,11 +233,7 @@ function createGuideWindow() {
     skipTaskbar: true,
     fullscreenable: false,
     icon: appIcon(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    webPreferences: WEB_PREFS,
   });
   guideWin.setAlwaysOnTop(true, 'screen-saver');
   guideWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
@@ -393,6 +392,13 @@ function showGuide() {
 // ---------------------------------------------------------------------------
 // 개발자 미리보기 창 (phase/시간 스크럽)
 // ---------------------------------------------------------------------------
+// 개발자 창은 phase·시각을 가짜로 바꿔둔다 — 창을 접으면 실시간으로 되돌린다
+function resetDevOverrides() {
+  overridePhase = null;
+  mockNow = null;
+  pushGuideData();
+}
+
 function createDevWindow() {
   devWin = new BrowserWindow({
     width: 340,
@@ -405,11 +411,7 @@ function createDevWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     icon: appIcon(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
+    webPreferences: WEB_PREFS,
   });
   devWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   devWin.loadFile(path.join(__dirname, 'renderer', 'dev.html'));
@@ -419,10 +421,7 @@ function createDevWindow() {
     if (!app.isQuitting) {
       e.preventDefault();
       w.hide();
-      // 창을 닫으면 실시간으로 복귀
-      overridePhase = null;
-      mockNow = null;
-      pushGuideData();
+      resetDevOverrides();
     }
   });
 
@@ -436,9 +435,7 @@ function toggleDev() {
   if (!devWin) createDevWindow();
   if (devWin.isVisible()) {
     devWin.hide();
-    overridePhase = null;
-    mockNow = null;
-    pushGuideData();
+    resetDevOverrides();
   } else {
     const wa = screen.getPrimaryDisplay().workArea;
     safeSetPosition(devWin, wa.x + 40, wa.y + 60);
@@ -1084,7 +1081,6 @@ function createTray() {
 // ---------------------------------------------------------------------------
 // IPC (렌더러 → 메인)
 // ---------------------------------------------------------------------------
-ipcMain.handle('mascot:getConfig', () => ({ dnd, port: CONFIG.port }));
 // 캐릭터 애니메이션 (charactor/*.json — 마름모 아트보드 포맷)
 ipcMain.handle('mascot:getAnims', () => {
   const dir = path.join(__dirname, 'charactor');
@@ -1226,9 +1222,7 @@ ipcMain.on('dev:font', (_e, opts = {}) => {
 });
 ipcMain.on('dev:hide', () => {
   if (devWin && devWin.isVisible()) devWin.hide();
-  overridePhase = null;
-  mockNow = null;
-  pushGuideData();
+  resetDevOverrides();
 });
 
 // ---------------------------------------------------------------------------
@@ -1290,6 +1284,8 @@ app.on('will-quit', () => {
   stopWander();
   if (wanderTimer) clearTimeout(wanderTimer);
   if (returnTimer) clearTimeout(returnTimer);
+  if (sleepTimer) clearTimeout(sleepTimer);
   if (hiddenSweeper) clearInterval(hiddenSweeper);
+  scheduledTimers.forEach(cancelScheduled);
   if (server) server.close();
 });
