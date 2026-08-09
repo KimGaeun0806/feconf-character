@@ -23,6 +23,8 @@ contextBridge.exposeInMainWorld('mascot', {
   // 안내 패널
   guideGetData: () => ipcRenderer.invoke('guide:getData'),
   guideClose: () => ipcRenderer.send('guide:close'),
+  guideDragStart: () => ipcRenderer.send('guide:dragStart'),
+  guideDrag: (dx, dy) => ipcRenderer.send('guide:drag', { dx, dy }),
   onGuideData: (cb) => ipcRenderer.on('guide:data', (_e, d) => cb(d)),
   openExternal: (url) => ipcRenderer.send('open:external', url),
 });

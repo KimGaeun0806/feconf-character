@@ -124,12 +124,13 @@ function safeSetPosition(w, x, y) {
   w.setPosition(Math.round(x), Math.round(y));
 }
 
-// 창이 통째로 보이도록 좌표를 화면 안쪽으로 밀어넣는다
-function clampedToWorkArea(x, y, w, h) {
+// 창이 통째로 보이도록 좌표를 화면 안쪽으로 밀어넣는다.
+// slack 을 주면 그만큼은 경계 밖을 허용한다 (드래그 의도를 기억할 때 쓴다)
+function clampedToWorkArea(x, y, w, h, slack = 0) {
   const wa = screen.getDisplayNearestPoint({ x, y }).workArea;
   return {
-    x: Math.max(wa.x, Math.min(x, wa.x + wa.width - w)),
-    y: Math.max(wa.y, Math.min(y, wa.y + wa.height - h)),
+    x: Math.max(wa.x - slack, Math.min(x, wa.x + wa.width - w + slack)),
+    y: Math.max(wa.y - slack, Math.min(y, wa.y + wa.height - h + slack)),
   };
 }
 
@@ -245,25 +246,18 @@ function createGuideWindow() {
     }
   });
 
-  // 우리가 옮긴 좌표가 아니면 사용자가 헤더를 잡고 끈 것 — 그 자리를 기억한다
-  let settle = null;
+  // 드래그는 guide:drag 가 처리한다 — 그 밖의 경로로(OS 가 옮겼다든지) 창이 움직였다면
+  // 화면 안에 남아 있는지만 확인한다
   const onMoved = () => {
     if (w.isDestroyed()) return;
     const [x, y] = w.getPosition();
     if (guideAutoPos && x === guideAutoPos.x && y === guideAutoPos.y) return;
-    guidePinnedPos = { x, y };
-    // 움직임이 멎으면 화면 안으로 되돌린다
-    if (settle) clearTimeout(settle);
-    settle = setTimeout(() => {
-      settle = null;
-      keepGuideOnScreen();
-    }, 150);
+    keepGuideOnScreen();
   };
-  w.on('moved', onMoved); // macOS 는 드래그가 끝날 때 한 번
-  w.on('move', onMoved); // 그 외 플랫폼
+  w.on('moved', onMoved);
+  w.on('move', onMoved);
 
   w.on('closed', () => {
-    if (settle) clearTimeout(settle);
     hiddenSince.delete(w);
     if (guideWin === w) guideWin = null;
   });
@@ -1006,6 +1000,35 @@ ipcMain.on('mascot:rightclick', () => {
 ipcMain.handle('guide:getData', () => guideData());
 ipcMain.on('guide:close', () => {
   if (guideWin && guideWin.isVisible()) guideWin.hide();
+});
+
+// 패널 드래그 — 커서가 화면 밖으로 나가도 창은 경계에서 멈춘다. 커서가 얼마나 더
+// 나갔는지를 따로 들고 있어야 되돌아올 때 잡은 지점이 어긋나지 않는다. 다만 한없이
+// 기억하면 멀리 끌었다가 돌아올 때 한참 움직여야 하므로 경계 밖 일정 거리까지만 센다.
+const DRAG_SLACK = 120;
+let guideDragIntent = null;
+
+ipcMain.on('guide:dragStart', () => {
+  guideDragIntent = null;
+});
+ipcMain.on('guide:drag', (_e, { dx, dy } = {}) => {
+  if (!guideWin || guideWin.isDestroyed()) return;
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+  const [gw, gh] = guideWin.getSize();
+  if (!guideDragIntent) {
+    const [x, y] = guideWin.getPosition();
+    guideDragIntent = { x, y };
+  }
+  guideDragIntent = clampedToWorkArea(
+    guideDragIntent.x + dx,
+    guideDragIntent.y + dy,
+    gw,
+    gh,
+    DRAG_SLACK
+  );
+  const p = clampedToWorkArea(guideDragIntent.x, guideDragIntent.y, gw, gh);
+  guidePinnedPos = p;
+  moveGuideTo(p.x, p.y);
 });
 ipcMain.on('open:external', (_e, url) => {
   if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
