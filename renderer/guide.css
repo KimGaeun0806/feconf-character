@@ -68,6 +68,12 @@ header {
   background: var(--bg);
   border-bottom: 1px solid var(--border);
   flex: none;
+  /* 헤더를 잡고 끌어서 패널을 옮긴다 — 옮긴 뒤에는 달팽이를 따라다니지 않는다 */
+  -webkit-app-region: drag;
+  cursor: grab;
+}
+header:active {
+  cursor: grabbing;
 }
 .head-left {
   display: flex;
@@ -118,6 +124,7 @@ header {
   cursor: pointer;
   line-height: 1;
   transition: background 0.12s ease, color 0.12s ease;
+  -webkit-app-region: no-drag; /* 드래그 영역 안의 버튼은 따로 빼줘야 눌린다 */
 }
 #close:hover {
   background: var(--surface-2);

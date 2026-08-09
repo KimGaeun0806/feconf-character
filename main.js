@@ -238,14 +238,41 @@ function createGuideWindow() {
     }
   });
 
+  // 우리가 옮긴 좌표가 아니면 사용자가 헤더를 잡고 끈 것 — 그 자리를 기억한다
+  const onMoved = () => {
+    if (w.isDestroyed()) return;
+    const [x, y] = w.getPosition();
+    if (guideAutoPos && x === guideAutoPos.x && y === guideAutoPos.y) return;
+    guidePinnedPos = { x, y };
+  };
+  w.on('moved', onMoved); // macOS 는 드래그가 끝날 때 한 번
+  w.on('move', onMoved); // 그 외 플랫폼
+
   w.on('closed', () => {
     hiddenSince.delete(w);
     if (guideWin === w) guideWin = null;
   });
 }
 
+// 패널은 기본적으로 달팽이를 따라다니지만, 사용자가 헤더를 잡고 옮기면 그 자리를
+// 지킨다. 우리가 옮긴 좌표를 기억해 두고 그와 다른 곳으로 움직였으면 사용자가 끈 것.
+let guidePinnedPos = null;
+let guideAutoPos = null;
+
+function moveGuideTo(x, y) {
+  guideAutoPos = { x: Math.round(x), y: Math.round(y) };
+  safeSetPosition(guideWin, x, y);
+}
+
 function positionGuide() {
   if (!win || !guideWin) return;
+  if (guidePinnedPos) {
+    const [cx, cy] = guideWin.getPosition();
+    if (cx !== guidePinnedPos.x || cy !== guidePinnedPos.y) {
+      moveGuideTo(guidePinnedPos.x, guidePinnedPos.y); // 다시 만들어진 창을 그 자리로
+    }
+    return;
+  }
   const [mx, my] = win.getPosition();
   const wa = screen.getPrimaryDisplay().workArea;
   const gw = CONFIG.guideWidth;
@@ -262,7 +289,7 @@ function positionGuide() {
   gx = Math.max(wa.x + 4, Math.min(gx, wa.x + wa.width - gw - 4));
   gy = Math.max(wa.y + 4, Math.min(gy, wa.y + wa.height - gh - 4));
 
-  safeSetPosition(guideWin, gx, gy);
+  moveGuideTo(gx, gy);
 }
 
 function loadConference() {
@@ -711,8 +738,11 @@ function startServer() {
 
     if (req.method === 'GET' && url.pathname === '/debug/pos') {
       const pos = win && !win.isDestroyed() ? win.getPosition() : null;
+      const guidePos = guideWin && !guideWin.isDestroyed() ? guideWin.getPosition() : null;
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ pos, walkGoal, walkTarget }));
+      return res.end(
+        JSON.stringify({ pos, walkGoal, walkTarget, guidePos, guidePinned: !!guidePinnedPos })
+      );
     }
 
     if (req.method === 'GET' && url.pathname === '/health') {
@@ -870,7 +900,18 @@ function buildTrayMenu() {
         rebuildTray();
       },
     },
-    { label: '📍 위치 재정렬', click: () => { if (win) { stopWander(); const { x, y } = cornerPosition(); safeSetPosition(win, x, y); wanderHomeX = x; } } },
+    {
+      label: '📍 위치 재정렬',
+      click: () => {
+        if (!win) return;
+        stopWander();
+        const { x, y } = cornerPosition();
+        safeSetPosition(win, x, y);
+        wanderHomeX = x;
+        guidePinnedPos = null; // 옮겨둔 안내 패널도 제자리로 — 다시 따라다닌다
+        if (guideWin && guideWin.isVisible()) positionGuide();
+      },
+    },
     { label: '🗓 스케줄 다시 로드', click: () => armSchedule() },
     { label: '🛠 개발자 미리보기 (phase/시간)', click: () => toggleDev() },
     { type: 'separator' },
