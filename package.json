@@ -1,10 +1,10 @@
 {
-  "name": "feconf-mascot",
+  "name": "feconf-2026-mascot",
   "version": "0.1.0",
   "description": "픽셀아트 데스크탑 달팽이 마스코트 — 빌드/테스트/dev 서버 상태 메이트 (+ 컨퍼런스 안내)",
   "main": "main.js",
   "bin": {
-    "feconf-mascot": "scripts/start-branded-dev.js",
+    "feconf-2026-mascot": "scripts/start-branded-dev.js",
     "mascot-watch": "integrations/mascot-watch.js"
   },
   "files": [

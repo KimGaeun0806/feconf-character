@@ -42,6 +42,12 @@
 바로 띄워보기 — 클론 없이 한 줄로 실행됩니다. (Electron 바이너리를 내려받으므로 첫 실행은 1~2분 걸려요)
 
 ```bash
+npx feconf-2026-mascot
+```
+
+아직 npm 에 올라가기 전이거나 최신 커밋을 바로 써보고 싶다면 GitHub 에서 직접 받아도 됩니다.
+
+```bash
 npx github:KimGaeun0806/feconf-character
 ```
 
