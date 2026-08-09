@@ -124,6 +124,11 @@ function safeSetPosition(w, x, y) {
   w.setPosition(Math.round(x), Math.round(y));
 }
 
+// 끌다가 경계에 막혔을 때, 커서가 밖으로 나간 거리를 이만큼까지만 기억한다. 한없이
+// 세면 멀리 끌었다 돌아올 때 한참 헛돌고, 아예 세지 않으면 되돌아오는 순간 창이
+// 커서에 달라붙어 잡은 지점이 어긋난다.
+const DRAG_SLACK = 120;
+
 // 창이 통째로 보이도록 좌표를 화면 안쪽으로 밀어넣는다.
 // slack 을 주면 그만큼은 경계 밖을 허용한다 (드래그 의도를 기억할 때 쓴다)
 function clampedToWorkArea(x, y, w, h, slack = 0) {
@@ -763,8 +768,25 @@ function startServer() {
       const guidePos = guideWin && !guideWin.isDestroyed() ? guideWin.getPosition() : null;
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(
-        JSON.stringify({ pos, walkGoal, walkTarget, guidePos, guidePinned: !!guidePinnedPos })
+        JSON.stringify({
+          pos,
+          walkGoal,
+          walkTarget,
+          guidePos,
+          guidePinned: !!guidePinnedPos,
+          charBox,
+          workArea: screen.getPrimaryDisplay().workArea,
+        })
       );
+    }
+
+    if (req.method === 'GET' && url.pathname === '/debug/drag') {
+      // 개발용: 마우스 없이 드래그를 흉내내 경계 동작을 확인한다
+      if (url.searchParams.get('start')) mascotDragIntent = null;
+      dragMascot(Number(url.searchParams.get('dx') || 0), Number(url.searchParams.get('dy') || 0));
+      const pos = win && !win.isDestroyed() ? win.getPosition() : null;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify({ pos }));
     }
 
     if (req.method === 'GET' && url.pathname === '/health') {
@@ -982,13 +1004,55 @@ ipcMain.on('mascot:setIgnoreMouse', (_e, ignore) => {
     win.setIgnoreMouseEvents(!!ignore, { forward: true });
   }
 });
-ipcMain.on('mascot:drag', (_e, { dx, dy }) => {
-  if (!win) return;
-  stopWander(); // 끌고 가는 중엔 산책이 위치를 건드리지 않게
-  const [x, y] = win.getPosition();
-  safeSetPosition(win, x + dx, y + dy);
-  wanderHomeX = null; // 놓은 자리를 새 기준점으로
+// 창 안에서 캐릭터가 그려지는 칸 (렌더러가 알려준다). 못 받았으면 창 전체로 본다.
+let charBox = null;
+ipcMain.on('mascot:charBox', (_e, box = {}) => {
+  const ok = ['left', 'top', 'right', 'bottom'].every((k) => Number.isFinite(box[k]));
+  if (ok) charBox = box;
 });
+
+// 달팽이가 화면 밖으로 나가지 못하게 — 창은 말풍선 자리까지 포함해 캐릭터보다 훨씬
+// 크므로, 창이 아니라 캐릭터가 그려지는 칸이 화면 안에 남도록 잡는다. 창 모서리는
+// 투명하니 화면 밖으로 나가도 보이지 않는다.
+function clampMascotPos(x, y) {
+  const b = charBox || { left: 0, top: 0, right: CONFIG.width, bottom: CONFIG.height };
+  const wa = screen.getDisplayNearestPoint({ x: x + b.left, y: y + b.top }).workArea;
+  const minX = wa.x - b.left;
+  const maxX = wa.x + wa.width - b.right;
+  const minY = wa.y - b.top;
+  const maxY = wa.y + wa.height - b.bottom;
+  return {
+    x: Math.min(Math.max(x, Math.min(minX, maxX)), Math.max(minX, maxX)),
+    y: Math.min(Math.max(y, Math.min(minY, maxY)), Math.max(minY, maxY)),
+  };
+}
+
+// 안내 패널과 같은 방식 — 커서가 경계 밖으로 나간 만큼을 따로 기억해야 되돌아올 때
+// 잡은 지점이 어긋나지 않는다.
+let mascotDragIntent = null;
+
+function dragMascot(dx, dy) {
+  if (!win || win.isDestroyed()) return;
+  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+  stopWander(); // 끌고 가는 중엔 산책이 위치를 건드리지 않게
+  if (!mascotDragIntent) {
+    const [x, y] = win.getPosition();
+    mascotDragIntent = { x, y };
+  }
+  const wanted = { x: mascotDragIntent.x + dx, y: mascotDragIntent.y + dy };
+  const limit = clampMascotPos(wanted.x, wanted.y);
+  mascotDragIntent = {
+    x: Math.min(Math.max(wanted.x, limit.x - DRAG_SLACK), limit.x + DRAG_SLACK),
+    y: Math.min(Math.max(wanted.y, limit.y - DRAG_SLACK), limit.y + DRAG_SLACK),
+  };
+  safeSetPosition(win, limit.x, limit.y);
+  wanderHomeX = null; // 놓은 자리를 새 기준점으로
+}
+
+ipcMain.on('mascot:dragStart', () => {
+  mascotDragIntent = null;
+});
+ipcMain.on('mascot:drag', (_e, { dx, dy } = {}) => dragMascot(dx, dy));
 ipcMain.on('mascot:click', () => {
   // 인사 + D-day 팝업은 렌더러가 창 안 오버레이로 처리 (안내 패널은 트레이에서)
   scheduleSleep();
@@ -1002,10 +1066,7 @@ ipcMain.on('guide:close', () => {
   if (guideWin && guideWin.isVisible()) guideWin.hide();
 });
 
-// 패널 드래그 — 커서가 화면 밖으로 나가도 창은 경계에서 멈춘다. 커서가 얼마나 더
-// 나갔는지를 따로 들고 있어야 되돌아올 때 잡은 지점이 어긋나지 않는다. 다만 한없이
-// 기억하면 멀리 끌었다가 돌아올 때 한참 움직여야 하므로 경계 밖 일정 거리까지만 센다.
-const DRAG_SLACK = 120;
+// 패널 드래그 — 커서가 화면 밖으로 나가도 창은 경계에서 멈춘다
 let guideDragIntent = null;
 
 ipcMain.on('guide:dragStart', () => {

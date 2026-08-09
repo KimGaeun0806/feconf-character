@@ -626,6 +626,7 @@ cv.addEventListener('mousedown', (e) => {
   dragging = true;
   moved = 0;
   last = { x: e.screenX, y: e.screenY };
+  if (window.mascot && window.mascot.dragStart) window.mascot.dragStart();
 });
 
 // 오른쪽 클릭 → 개발자 미리보기 패널
@@ -704,6 +705,16 @@ function tick() {
   setTimeout(tick, drawInterval());
 }
 tick();
+
+// 창은 말풍선 자리까지 포함해 캐릭터보다 한참 크다 — 화면 경계를 창이 아니라 캐릭터
+// 기준으로 잡을 수 있도록, 캔버스가 창 안 어디에 놓였는지 메인에 알려준다.
+function reportCharBox() {
+  if (!window.mascot || !window.mascot.setCharBox) return;
+  const r = cv.getBoundingClientRect();
+  window.mascot.setCharBox({ left: r.left, top: r.top, right: r.right, bottom: r.bottom });
+}
+window.addEventListener('load', reportCharBox);
+reportCharBox();
 
 // 숨긴 창의 타이머는 브라우저가 초당 1회로 늦춘다 — 다시 보일 때 곧바로 따라잡는다
 document.addEventListener('visibilitychange', () => {

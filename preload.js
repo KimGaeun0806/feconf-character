@@ -15,7 +15,10 @@ contextBridge.exposeInMainWorld('mascot', {
   // 렌더러 → 메인
   getConfig: () => ipcRenderer.invoke('mascot:getConfig'),
   getAnims: () => ipcRenderer.invoke('mascot:getAnims'),
+  dragStart: () => ipcRenderer.send('mascot:dragStart'),
   drag: (dx, dy) => ipcRenderer.send('mascot:drag', { dx, dy }),
+  // 창 안에서 캐릭터가 실제로 그려지는 칸 — 화면 경계를 이 칸 기준으로 잡는다
+  setCharBox: (box) => ipcRenderer.send('mascot:charBox', box),
   setIgnoreMouse: (ignore) => ipcRenderer.send('mascot:setIgnoreMouse', ignore),
   click: () => ipcRenderer.send('mascot:click'),
   rightClick: () => ipcRenderer.send('mascot:rightclick'),
