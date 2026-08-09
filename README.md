@@ -15,7 +15,7 @@
 - 🪟 투명 · 항상 위 · 드래그 이동 가능한 창 (독/작업표시줄 숨김, 트레이 상주, 빈 영역은 클릭 통과)
 - 💗 **마스코트 클릭 → 인사 + FECONF D-day 팝업** (컨퍼런스 안내 패널은 트레이 메뉴에서)
 - 🔔 **웹훅**으로 알림 수신 → SVG 말풍선(픽셀 폰트) + OS 알림 + 캐릭터 반응
-- 🗓 **세션 스케줄**(schedule.json)에 맞춰 자동 알림
+- 🗓 **세션 스케줄**(shared/conference.js)에 맞춰 자동 알림
 - 😴 유휴 시 자동으로 잠자기(숨결 z), 깨울 땐 깸 애니메이션으로 부스스 일어남
 - 🔕 방해 금지(DND) 모드
 - ⌨️ 전역 단축키: `Cmd/Ctrl+Shift+M`(숨김/표시), `Cmd/Ctrl+Shift+H`(인사)
@@ -226,7 +226,7 @@ curl -X POST localhost:7842/vitals \
 
 ## 안내 패널 — 날짜별 3가지 상태
 
-트레이 메뉴 → "📋 안내 패널"로 여는 안내 패널은 **오늘 날짜와 행사 날짜([conference.json](conference.json)의 `startDate`~`endDate`)를 비교**해 자동으로 바뀝니다. (마스코트 클릭은 D-day 팝업)
+트레이 메뉴 → "📋 안내 패널"로 여는 안내 패널은 **오늘 날짜와 행사 날짜([shared/conference.js](shared/conference.js)의 `startDate`~`endDate`)를 비교**해 자동으로 바뀝니다. (마스코트 클릭은 D-day 팝업)
 
 | 상태             | 시점               | 내용                                             |
 | ---------------- | ------------------ | ------------------------------------------------ |
@@ -234,20 +234,21 @@ curl -X POST localhost:7842/vitals \
 | 🎤 **dayof**     | 행사 당일          | 다음 세션 카운트다운 + 오늘의 세션 타임라인       |
 | 🎉 **after**     | 행사 후            | 감사 인사 + **후기 남기기** 버튼 + Discord        |
 
-행사 정보는 [conference.json](conference.json) 에서 편집합니다:
+**장소·날짜·시간을 포함한 컨퍼런스 정보는 [shared/conference.js](shared/conference.js) 한 파일에 모여 있습니다.**
 
-```json
-{
-  "name": "우리 컨퍼런스 2026",
-  "shortName": "FECONF",
-  "startDate": "2026-10-10",
-  "endDate": "2026-10-10",
-  "venue": "코엑스 그랜드볼룸 (3층)",
-  "address": "서울 강남구 영동대로 513",
-  "discord": { "url": "https://discord.gg/...", "note": "공지·네트워킹 채널" },
-  "reviewUrl": "https://forms.gle/...",
-  "reviewNote": "1분이면 끝나요 🙌"
-}
+```js
+module.exports = {
+  name: '우리 컨퍼런스 2026',
+  shortName: 'FECONF', // D-day 팝업 문구: "FECONF까지 D-62"
+  startDate: '2026-10-10',
+  endDate: '2026-10-10',
+  venue: '코엑스 그랜드볼룸 (3층)',
+  address: '서울 강남구 영동대로 513',
+  discord: { url: 'https://discord.gg/...', note: '공지·네트워킹 채널' },
+  reviewUrl: 'https://forms.gle/...',
+  reviewNote: '1분이면 끝나요 🙌',
+  sessions: [{ time: '13:00', leadMinutes: 5, title: '키노트', message: '곧 시작!', level: 'info' }],
+};
 ```
 
 **행사 날짜는 여기가 유일한 출처입니다.** `startDate` 한 줄만 고치면 D-day·안내 패널·세션 알림 시각이 모두 따라옵니다. `shortName` 은 마스코트 클릭 시 뜨는 D-day 팝업 문구(`FECONF까지 D-62`)에 쓰이고, 없으면 `name` 을 씁니다.
@@ -272,12 +273,12 @@ curl -X POST localhost:7842/vitals \
 
 ## 스케줄 편집
 
-[schedule.json](schedule.json) 에 세션을 넣으면 `leadMinutes` 전에 자동 알림이 뜹니다. 트레이 메뉴 → "🗓 스케줄 다시 로드" 로 재적용.
+[shared/conference.js](shared/conference.js) 의 `sessions` 에 세션을 넣으면 `leadMinutes` 전에 자동 알림이 뜹니다. 트레이 메뉴 → "🗓 스케줄 다시 로드" 로 앱을 끄지 않고 재적용.
 
-`time` 에는 **시:분만** 적습니다. 날짜는 `conference.json` 의 행사 날짜에서 물려받으므로, 행사가 미뤄져도 스케줄은 손대지 않아도 됩니다.
+`time` 에는 **시:분만** 적습니다. 날짜는 같은 파일의 행사 날짜에서 물려받으므로, 행사가 미뤄져도 세션은 손대지 않아도 됩니다.
 
-```json
-{ "time": "14:30", "leadMinutes": 10, "title": "AI 세션", "message": "곧 시작!", "level": "success" }
+```js
+{ time: '14:30', leadMinutes: 10, title: 'AI 세션', message: '곧 시작!', level: 'success' }
 ```
 
 | 필드 | 뜻 |

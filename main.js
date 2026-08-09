@@ -318,14 +318,17 @@ function positionGuide() {
   moveGuideTo(gx, gy);
 }
 
+// 트레이의 "다시 로드" 로 편집을 바로 반영할 수 있게, 캐시를 버리고 매번 다시 읽는다.
+// 파일을 고치다 문법이 깨져도 앱은 살아있어야 하므로 실패는 빈 값으로 넘긴다.
+const CONFERENCE_PATH = require.resolve('./shared/conference');
 function loadConference() {
-  const p = path.join(__dirname, 'conference.json');
   try {
-    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+    delete require.cache[CONFERENCE_PATH];
+    return require('./shared/conference');
   } catch (e) {
     console.error('[conference] 읽기 실패:', e.message);
+    return {};
   }
-  return {};
 }
 
 function effNow() {
@@ -946,9 +949,9 @@ function startServer() {
 // ---------------------------------------------------------------------------
 // 컨퍼런스 세션 스케줄
 // ---------------------------------------------------------------------------
-// 세션에는 "13:00" 처럼 시:분만 적는다 — 날짜는 conference.json 의 행사 날짜에서
+// 세션에는 "13:00" 처럼 시:분만 적는다 — 날짜는 shared/conference.js 의 행사 날짜에서
 // 물려받으므로, 행사 날짜 한 줄만 고치면 스케줄이 통째로 따라온다. 여러 날 행사면
-// day: 2 로 며칠째인지 적는다. 예전처럼 전체 날짜를 적어두면 그 날짜를 그대로 쓴다.
+// day: 2 로 며칠째인지 적는다. 전체 날짜를 적어두면 그 날짜를 그대로 쓴다.
 function resolveSessionTime(item, conf) {
   const raw = String(item.time || '').trim();
   if (!raw) return NaN;
@@ -965,17 +968,8 @@ function resolveSessionTime(item, conf) {
 
 // 시각을 여기서 한 번 확정해, 알림 예약과 두 패널이 모두 같은 절대 시각을 본다.
 function loadSchedule() {
-  const p = path.join(__dirname, 'schedule.json');
-  let raw = [];
-  try {
-    if (fs.existsSync(p)) raw = JSON.parse(fs.readFileSync(p, 'utf8'));
-  } catch (e) {
-    console.error('[schedule] 읽기 실패:', e.message);
-    return [];
-  }
-  if (!Array.isArray(raw)) return [];
-
   const conf = loadConference();
+  const raw = Array.isArray(conf.sessions) ? conf.sessions : [];
   return raw
     .map((it) => {
       const at = resolveSessionTime(it, conf);

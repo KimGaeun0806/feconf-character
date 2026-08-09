@@ -8,7 +8,7 @@
 //   main.js         →  const TIME = require('./shared/time');
 //   renderer/*.html →  <script src="../shared/time.js"></script>  뒤에 전역 TIME
 //
-// 행사 날짜·세션 시각은 여기가 아니라 conference.json / schedule.json 에 있다.
+// 행사 날짜·세션 시각은 여기가 아니라 shared/conference.js 에 있다.
 // 이 파일은 "앱이 얼마나 기다리는가"만 다룬다.
 // ===========================================================================
 
@@ -37,7 +37,7 @@
   // ---- 알림 ----
   const NOTIFICATION_RELEASE_MS = 60 * SEC; // close 이벤트가 안 와도 이때는 놓아준다
   const FIRST_GREET_MS = 800; // 앱이 뜨고 첫 인사까지
-  const DEFAULT_LEAD_MIN = 5; // 세션 알림을 몇 분 전에 띄울지 (schedule.json 기본값)
+  const DEFAULT_LEAD_MIN = 5; // 세션 알림을 몇 분 전에 띄울지 (leadMinutes 기본값)
   const SESSION_UPCOMING_MS = 30 * MIN; // 안내 패널에서 세션이 "예정"으로 눈에 띄는 구간
   const MAX_TIMEOUT_MS = 2147483647; // setTimeout 한 번에 맡길 수 있는 최대치(약 24.8일)
 

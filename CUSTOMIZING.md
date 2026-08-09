@@ -11,7 +11,7 @@
 | 미리보기 | 각 애니메이션의 첫 프레임 SVG (앱은 사용 안 함, 눈으로 고를 때용) | [charactor/](charactor/) `*-미리보기.svg` |
 | 말풍선 | JSON 픽셀 말풍선 3종(만화/퍼플/코지) + 기본 SVG 생각풍선(classic) | [charactor/](charactor/) `말풍선-*.json` |
 | 폰트 | MonaS12(픽셀, 기본) · Pretendard (dev 패널에서 토글) | [renderer/fonts/](renderer/fonts/) |
-| 데이터 | 행사 정보 · 세션 스케줄 | [conference.json](conference.json) · [schedule.json](schedule.json) |
+| 컨퍼런스 정보 | 행사 이름·날짜·장소·링크 + 세션 목록 | [shared/conference.js](shared/conference.js) |
 | 시간 상수 | 잠들기·말풍선 유지·산책 간격 등 "얼마나 기다리는가" 전부 | [shared/time.js](shared/time.js) |
 | 앱 본체 | 창/트레이/상태 머신/웹훅 서버 (main) + 렌더링 (renderer) | [main.js](main.js) · [renderer/](renderer/) |
 
@@ -30,6 +30,7 @@
 | [renderer/dev.html](renderer/dev.html) / [dev.js](renderer/dev.js) | 개발자 미리보기 패널 | 커스텀한 기능의 테스트 버튼 추가 |
 | [integrations/](integrations/) | mascot-watch CLI · Vite 플러그인 · 재사용 클라이언트 | 다른 툴 연동 (webpack, git hook, CI…) |
 | [scripts/send.js](scripts/send.js) | 웹훅 CLI 헬퍼 | – |
+| [shared/conference.js](shared/conference.js) | 행사 이름·날짜·장소·링크 + 세션 목록 (main 만 읽고 렌더러엔 IPC 로 전달) | 행사 정보, 세션 추가/수정 |
 | [shared/time.js](shared/time.js) | 시간 상수와 날짜 헬퍼 — main 과 렌더러 세 창이 같은 값을 본다 | 잠들기·말풍선·딴짓·산책 타이밍, 프레임 상한 |
 
 ### 창/동작 스펙 (main.js 기본값)
@@ -45,8 +46,8 @@
 
 | 무엇 | 어디 |
 | --- | --- |
-| 행사 날짜 | [conference.json](conference.json) 의 `startDate`·`endDate` — D-day, 안내 패널, 세션 알림 시각이 모두 여기서 나온다 |
-| 세션 시각 | [schedule.json](schedule.json) 에 **시:분만** 적고 날짜는 행사 날짜에서 물려받는다 |
+| 행사 날짜·장소 | [shared/conference.js](shared/conference.js) 의 `startDate`·`endDate`·`venue` — D-day, 안내 패널, 세션 알림 시각이 모두 여기서 나온다 |
+| 세션 시각 | 같은 파일의 `sessions` 에 **시:분만** 적고 날짜는 행사 날짜에서 물려받는다 |
 | 기다리는 시간 | [shared/time.js](shared/time.js) — 잠들기, 말풍선 유지, 딴짓 간격, 프레임 상한, Web Vitals 억제 간격 등 |
 
 `shared/time.js` 는 `require` 와 `<script>` 양쪽으로 읽히도록 만들어져 있어서, main 프로세스와 렌더러 세 창이 같은 값을 봅니다. 렌더러에서는 전역 `TIME` 으로 쓰세요.
