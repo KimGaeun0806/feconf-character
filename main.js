@@ -254,8 +254,9 @@ function createGuideWindow() {
   });
 }
 
-// 패널은 기본적으로 달팽이를 따라다니지만, 사용자가 헤더를 잡고 옮기면 그 자리를
-// 지킨다. 우리가 옮긴 좌표를 기억해 두고 그와 다른 곳으로 움직였으면 사용자가 끈 것.
+// 패널은 열 때 달팽이 옆에 자리를 잡을 뿐, 그 뒤로는 달팽이가 어디로 가든 그 자리에
+// 머문다. 사용자가 헤더를 잡고 옮겼다면 다음에 열 때도 옮겨둔 자리에 뜬다 — 우리가
+// 옮긴 좌표를 기억해 두고, 그와 다른 곳으로 움직였을 때만 사용자가 끈 것으로 본다.
 let guidePinnedPos = null;
 let guideAutoPos = null;
 
@@ -482,7 +483,6 @@ function stepWalk() {
     lastDir = dir;
     sendToMascot('mascot:state', { state: 'walking', dir });
   }
-  if (guideWin && guideWin.isVisible()) positionGuide(); // 안내 패널 따라오기
 }
 function onArrive() {
   walkTarget = null;
@@ -601,7 +601,6 @@ function takeStep(dir, left, b) {
     n++;
     // 시작점→목표를 보간해야 한 틱 이동량이 1px 미만이어도 반올림에 먹히지 않는다
     safeSetPosition(win, sx + (target - sx) * (n / ticks), sy);
-    if (guideWin && guideWin.isVisible()) positionGuide(); // 안내 패널 따라오기
     if (n >= ticks) {
       clearInterval(wanderMover);
       wanderMover = null;
