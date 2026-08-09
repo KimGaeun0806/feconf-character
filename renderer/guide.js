@@ -262,5 +262,10 @@ if (window.mascot && window.mascot.onGuideData) {
 }
 
 refresh();
-setInterval(tickClock, 1000); // 시계는 매초
-setInterval(render, 15000); // 상태/카운트다운은 15초마다 갱신
+// 패널은 대부분 숨겨져 있다 — 보이지 않는 동안 DOM 을 다시 그릴 이유가 없다
+setInterval(() => {
+  if (!document.hidden) tickClock();
+}, 1000);
+setInterval(() => {
+  if (!document.hidden) render();
+}, 15000);

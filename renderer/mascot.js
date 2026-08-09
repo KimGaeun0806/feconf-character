@@ -357,14 +357,19 @@ let lastState = null;
 let stateStart = 0;
 let nextQuirk = 0; // idle 중 가끔 갸웃/빼꼼
 
+let lastSig = ''; // 마지막으로 그린 그림의 식별자
+
 function drawCat(now) {
   const state = effectiveState();
   if (state !== lastState) {
     lastState = state;
     stateStart = now;
+    lastSig = ''; // 상태가 바뀌면 무조건 다시 그린다
   }
-  ctx.clearRect(0, 0, LW, LH);
-  if (!animsRaw || !VIEW) return;
+  if (!animsRaw || !VIEW) {
+    ctx.clearRect(0, 0, LW, LH);
+    return;
+  }
 
   // idle 로 가만히 있으면 가끔 두리번(갸웃)/빼꼼
   if (state !== 'idle') {
@@ -376,26 +381,34 @@ function drawCat(now) {
 
   const a = ANIM[state] || ANIM.idle;
   const frames = framesFor(a.file);
-  if (!frames.length) return;
+  if (!frames.length) {
+    ctx.clearRect(0, 0, LW, LH);
+    return;
+  }
   let idx = 0;
   if (a.fps > 0) {
     idx = Math.floor(((now - stateStart) / 1000) * a.fps);
     idx = a.loop ? idx % frames.length : Math.min(idx, frames.length - 1);
   }
-  const frame = frames[idx];
-
-  ctx.save();
   // 기본은 왼쪽을 보는 그림 — 오른쪽으로 걸을 땐 좌우 반전
-  if (state === 'walking' && walkDir > 0) {
+  const flip = state === 'walking' && walkDir > 0;
+  // idle 홀드 중엔 그리드 칸 단위 바운스 (기울기 축을 따라: 아래 1칸 = 왼쪽 tanA칸)
+  const bob = state === 'idle' ? Math.round(Math.sin((now / 1000) * 1.6) * 0.6) : 0;
+
+  // 결과가 직전과 같으면 캔버스를 건드리지 않는다 — idle 은 몇 초씩 같은 그림이라
+  // 매번 다시 그리면 렌더러와 GPU 합성이 쉬지 못한다.
+  const sig = `${state}|${idx}|${flip ? 1 : 0}|${bob}`;
+  if (sig === lastSig) return;
+  lastSig = sig;
+
+  ctx.clearRect(0, 0, LW, LH);
+  ctx.save();
+  if (flip) {
     ctx.translate(LW, 0);
     ctx.scale(-1, 1);
   }
-  // idle 홀드 중엔 그리드 칸 단위 바운스 (기울기 축을 따라: 아래 1칸 = 왼쪽 tanA칸)
-  if (state === 'idle') {
-    const bob = Math.round(Math.sin((now / 1000) * 1.6) * 0.6);
-    ctx.translate(-bob * VIEW.tanA * VIEW.cellL, bob * VIEW.cellL);
-  }
-  ctx.drawImage(frame, VIEW.ox, VIEW.oy, frame.width * VIEW.s, frame.height * VIEW.s);
+  if (bob) ctx.translate(-bob * VIEW.tanA * VIEW.cellL, bob * VIEW.cellL);
+  ctx.drawImage(frames[idx], VIEW.ox, VIEW.oy, frames[idx].width * VIEW.s, frames[idx].height * VIEW.s);
   ctx.restore();
 }
 
@@ -676,8 +689,23 @@ window.addEventListener('mouseup', () => {
 // ===========================================================================
 // 애니메이션 루프
 // ===========================================================================
-function loop(now) {
-  drawCat(now);
-  requestAnimationFrame(loop);
+// 항상 떠 있는 창이라 브라우저가 rAF 를 줄여주지 않아 120Hz 화면에서는 초당 120번
+// 깨어난다. 캐릭터 애니메이션은 최대 10fps 라 필요한 만큼만 타이머로 깨운다.
+const DRAW_FPS_CAP = 30;
+
+function drawInterval() {
+  const a = ANIM[effectiveState()] || ANIM.idle;
+  // idle 은 프레임이 한 장이지만 사인 바운스가 있어 최소한의 갱신은 필요하다
+  return 1000 / Math.min(DRAW_FPS_CAP, Math.max(a.fps || 0, 10));
 }
-requestAnimationFrame(loop);
+
+function tick() {
+  if (!document.hidden) drawCat(performance.now()); // 숨겨둔 동안은 그리지 않는다
+  setTimeout(tick, drawInterval());
+}
+tick();
+
+// 숨긴 창의 타이머는 브라우저가 초당 1회로 늦춘다 — 다시 보일 때 곧바로 따라잡는다
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) drawCat(performance.now());
+});

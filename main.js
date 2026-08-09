@@ -10,11 +10,22 @@ const {
   globalShortcut,
   nativeImage,
   Notification,
+  powerMonitor,
   shell,
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const http = require('http');
+
+// 트레이에 며칠씩 상주하는 앱이라 예외 하나로 통째로 죽으면 사용자는 이유도 모르고
+// 마스코트를 잃는다. 기록만 남기고 버틴다 — Node 는 처리되지 않은 rejection 도
+// 프로세스를 종료시키므로 둘 다 잡는다.
+process.on('uncaughtException', (e) => {
+  console.error('[fatal] 처리되지 않은 예외:', (e && e.stack) || e);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('[fatal] 처리되지 않은 rejection:', (reason && reason.stack) || reason);
+});
 
 // ---------------------------------------------------------------------------
 // 설정 (config.json 으로 덮어쓸 수 있음)
@@ -111,6 +122,18 @@ function safeSetPosition(w, x, y) {
   if (!w || w.isDestroyed()) return;
   if (!Number.isFinite(x) || !Number.isFinite(y)) return;
   w.setPosition(Math.round(x), Math.round(y));
+}
+
+// 모니터를 빼거나 해상도가 바뀌면 창이 보이지 않는 좌표에 남는다 — 커서가 닿을 수
+// 있는 영역으로 되돌린다. 트레이의 '위치 재정렬' 을 모르면 되찾을 방법이 없다.
+function clampWindowToScreen(w) {
+  if (!w || w.isDestroyed()) return;
+  const [x, y] = w.getPosition();
+  const [ww, wh] = w.getSize();
+  const wa = screen.getDisplayNearestPoint({ x, y }).workArea;
+  const nx = Math.max(wa.x, Math.min(x, wa.x + wa.width - ww));
+  const ny = Math.max(wa.y, Math.min(y, wa.y + wa.height - wh));
+  if (nx !== x || ny !== y) safeSetPosition(w, nx, ny);
 }
 
 function createWindow() {
@@ -536,12 +559,17 @@ function showSystemNotification(data = {}) {
     silent: false,
     icon: appIcon(),
   });
+  // 표시 전에 GC 되지 않도록 붙잡아 두는 용도 — 닫힘/실패를 못 받는 경우가 있어
+  // 시간이 지나면 놓아준다. 안 그러면 며칠 동안 알림 객체가 계속 쌓인다.
   activeNotifications.add(note);
+  const release = () => activeNotifications.delete(note);
   note.once('show', () => console.log('[notification] 표시됨:', data.title || '알림'));
   note.once('failed', (_event, error) => {
     console.error('[notification] 표시 실패:', error || 'unknown error');
+    release();
   });
-  note.once('close', () => activeNotifications.delete(note));
+  note.once('close', release);
+  setTimeout(release, 60000);
   note.show();
 }
 
@@ -589,10 +617,17 @@ function startServer() {
       const which = url.searchParams.get('win');
       const doCapture = (target) => {
         if (target && !target.isDestroyed()) {
-          target.webContents.capturePage().then((img) => {
-            res.writeHead(200, { 'Content-Type': 'image/png' });
-            res.end(img.toPNG());
-          });
+          target.webContents
+            .capturePage()
+            .then((img) => {
+              res.writeHead(200, { 'Content-Type': 'image/png' });
+              res.end(img.toPNG());
+            })
+            .catch((e) => {
+              console.error('[capture] 실패:', e.message);
+              res.writeHead(500);
+              res.end();
+            });
         } else {
           res.writeHead(503);
           res.end();
@@ -710,8 +745,29 @@ function loadSchedule() {
   return [];
 }
 
+// setTimeout 은 약 24.8일(2^31-1 ms)이 넘는 지연을 받으면 오버플로로 즉시 실행된다.
+// 컨퍼런스 일정은 몇 주 뒤가 흔해서 그대로 두면 앱을 켜자마자 알림이 쏟아진다.
+const MAX_TIMEOUT_MS = 2147483647;
+
+function scheduleAt(delay, fn) {
+  const ref = { handle: null };
+  const arm = (remaining) => {
+    if (remaining <= MAX_TIMEOUT_MS) {
+      ref.handle = setTimeout(fn, remaining);
+    } else {
+      ref.handle = setTimeout(() => arm(remaining - MAX_TIMEOUT_MS), MAX_TIMEOUT_MS);
+    }
+  };
+  arm(delay);
+  return ref;
+}
+
+function cancelScheduled(ref) {
+  if (ref && ref.handle) clearTimeout(ref.handle);
+}
+
 function armSchedule() {
-  scheduledTimers.forEach((t) => clearTimeout(t));
+  scheduledTimers.forEach(cancelScheduled);
   scheduledTimers.length = 0;
 
   const items = loadSchedule();
@@ -724,14 +780,15 @@ function armSchedule() {
     const fireAt = t - lead;
     const delay = fireAt - now;
     if (delay <= 0) continue; // 이미 지난 건 무시
-    const timer = setTimeout(() => {
-      handleEvent('notify', {
-        title: it.title || '세션 안내',
-        message: it.message || `곧 시작합니다: ${it.title || ''}`,
-        level: it.level || 'info',
-      });
-    }, delay);
-    scheduledTimers.push(timer);
+    scheduledTimers.push(
+      scheduleAt(delay, () => {
+        handleEvent('notify', {
+          title: it.title || '세션 안내',
+          message: it.message || `곧 시작합니다: ${it.title || ''}`,
+          level: it.level || 'info',
+        });
+      })
+    );
   }
   console.log(`[schedule] 예약된 알림 ${scheduledTimers.length}개`);
 }
@@ -893,6 +950,23 @@ app.whenReady().then(() => {
   globalShortcut.register('CommandOrControl+Shift+H', () =>
     handleEvent('state', { state: 'greet' })
   );
+
+  const onDisplayChange = () => {
+    stopWander();
+    clampWindowToScreen(win);
+    wanderHomeX = null; // 옮겨진 자리를 새 기준점으로
+    if (guideWin && guideWin.isVisible()) positionGuide();
+  };
+  screen.on('display-metrics-changed', onDisplayChange);
+  screen.on('display-added', onDisplayChange);
+  screen.on('display-removed', onDisplayChange);
+
+  // 맥이 몇 시간 자고 일어나면 예약은 이미 지나 있고 창은 엉뚱한 곳에 있을 수 있다
+  powerMonitor.on('resume', () => {
+    armSchedule();
+    scheduleSleep();
+    clampWindowToScreen(win);
+  });
 
   // 첫 인사
   setTimeout(() => handleEvent('state', { state: 'greet' }), 800);
