@@ -22,13 +22,21 @@ contextBridge.exposeInMainWorld('mascot', {
   click: () => ipcRenderer.send('mascot:click'),
   rightClick: () => ipcRenderer.send('mascot:rightclick'),
 
-  // 안내 패널
+  // 컨퍼런스 안내
   guideGetData: () => ipcRenderer.invoke('guide:getData'),
   guideClose: () => ipcRenderer.send('guide:close'),
   guideDragStart: () => ipcRenderer.send('guide:dragStart'),
   guideDrag: (dx, dy) => ipcRenderer.send('guide:drag', { dx, dy }),
   onGuideData: (cb) => ipcRenderer.on('guide:data', (_e, d) => cb(d)),
   openExternal: (url) => ipcRenderer.send('open:external', url),
+});
+
+// 사용 안내 창
+contextBridge.exposeInMainWorld('help', {
+  close: (opts) => ipcRenderer.send('help:close', opts),
+  dragStart: () => ipcRenderer.send('help:dragStart'),
+  drag: (dx, dy) => ipcRenderer.send('help:drag', { dx, dy }),
+  onShow: (cb) => ipcRenderer.on('help:show', () => cb()),
 });
 
 // 개발자 미리보기 패널용

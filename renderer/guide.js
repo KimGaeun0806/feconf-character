@@ -1,6 +1,6 @@
 'use strict';
 
-// 컨퍼런스 안내 패널 — 행사 전 / 당일 / 이후 3가지 상태
+// 컨퍼런스 안내 — 행사 전 / 당일 / 이후 3가지 상태
 // 시간은 main 이 넘겨준 data.now 를 기준으로 흐름(simNow) → 개발용 모의 시각 지원
 
 const contentEl = document.getElementById('content');
@@ -241,30 +241,13 @@ document.getElementById('close').addEventListener('click', () => {
 
 // 헤더를 잡고 패널을 옮긴다. 창이 따라 움직여도 어긋나지 않도록 화면 좌표의 변화량을
 // 보낸다 — 화면 경계에서 더 나가지 않게 막는 일은 메인 프로세스가 한다.
-(() => {
-  const header = document.querySelector('header');
-  if (!header || !window.mascot || !window.mascot.guideDrag) return;
-  let dragging = false;
-  let last = { x: 0, y: 0 };
-
-  header.addEventListener('mousedown', (e) => {
-    if (e.button !== 0 || e.target.closest('#close')) return;
-    dragging = true;
-    last = { x: e.screenX, y: e.screenY };
-    window.mascot.guideDragStart();
-    e.preventDefault();
+if (window.bindPanelDrag && window.mascot && window.mascot.guideDrag) {
+  window.bindPanelDrag(document.querySelector('header'), {
+    ignore: '#close',
+    onStart: () => window.mascot.guideDragStart(),
+    onMove: (dx, dy) => window.mascot.guideDrag(dx, dy),
   });
-  window.addEventListener('mousemove', (e) => {
-    if (!dragging) return;
-    const dx = e.screenX - last.x;
-    const dy = e.screenY - last.y;
-    last = { x: e.screenX, y: e.screenY };
-    if (dx || dy) window.mascot.guideDrag(dx, dy);
-  });
-  window.addEventListener('mouseup', () => {
-    dragging = false;
-  });
-})();
+}
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && window.mascot && window.mascot.guideClose) window.mascot.guideClose();
 });

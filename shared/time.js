@@ -37,6 +37,8 @@
   // ---- 알림 ----
   const NOTIFICATION_RELEASE_MS = 60 * SEC; // close 이벤트가 안 와도 이때는 놓아준다
   const FIRST_GREET_MS = 800; // 앱이 뜨고 첫 인사까지
+  const HELP_FIRST_SHOW_MS = 1600; // 첫 실행에서 사용 안내가 뜨기까지 (인사를 본 뒤)
+  const CONF_RELOAD_MS = 250; // 행사 정보 파일이 저장된 뒤 다시 읽기까지 (연속 저장 대비)
   const DEFAULT_LEAD_MIN = 5; // 세션 알림을 몇 분 전에 띄울지 (leadMinutes 기본값)
   const SESSION_UPCOMING_MS = 30 * MIN; // 안내 패널에서 세션이 "예정"으로 눈에 띄는 구간
   const MAX_TIMEOUT_MS = 2147483647; // setTimeout 한 번에 맡길 수 있는 최대치(약 24.8일)
@@ -70,6 +72,7 @@
   // ---- Web Vitals ----
   const VITALS_GAP_SAME_MS = 60 * SEC; // 같은 등급이면 이만큼 조용히
   const VITALS_GAP_CHANGED_MS = 6 * SEC; // 등급이 바뀌었으면 이만큼만 참는다
+  const VITALS_GAP_WORSE_MS = 1.5 * SEC; // 나빠졌다면 거의 바로 알린다
 
   // ---- 패널 갱신 ----
   const GUIDE_CLOCK_MS = 1 * SEC; // 안내 패널 시계
@@ -108,6 +111,8 @@
     HIDDEN_SWEEP_MS,
     NOTIFICATION_RELEASE_MS,
     FIRST_GREET_MS,
+    HELP_FIRST_SHOW_MS,
+    CONF_RELOAD_MS,
     DEFAULT_LEAD_MIN,
     SESSION_UPCOMING_MS,
     MAX_TIMEOUT_MS,
@@ -129,6 +134,7 @@
     DBLCLICK_MS,
     VITALS_GAP_SAME_MS,
     VITALS_GAP_CHANGED_MS,
+    VITALS_GAP_WORSE_MS,
     GUIDE_CLOCK_MS,
     GUIDE_RENDER_MS,
     DEV_FLASH_MS,

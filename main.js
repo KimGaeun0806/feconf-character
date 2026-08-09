@@ -90,6 +90,7 @@ let asleep = false;        // 자는 중이면 산책하지 않는다
 let overridePhase = null;  // 개발용 phase 강제 (before|dayof|after|null)
 let mockNow = null;        // 개발용 모의 시각(ms), null = 실시간
 let devWin = null;
+let helpWin = null;
 const scheduledTimers = [];
 const activeNotifications = new Set();
 
@@ -140,7 +141,7 @@ function clampedToWorkArea(x, y, w, h, slack = 0) {
 }
 
 // 모니터를 빼거나 해상도가 바뀌면 창이 보이지 않는 좌표에 남는다 — 커서가 닿을 수
-// 있는 영역으로 되돌린다. 트레이의 '위치 재정렬' 을 모르면 되찾을 방법이 없다.
+// 있는 영역으로 되돌린다. 그러지 않으면 되찾을 방법이 없다.
 function clampWindowToScreen(w) {
   if (!w || w.isDestroyed()) return;
   const [x, y] = w.getPosition();
@@ -199,7 +200,7 @@ const hiddenSince = new Map();
 let hiddenSweeper = null;
 
 function sweepHiddenWindows() {
-  for (const w of [guideWin, devWin]) {
+  for (const w of [guideWin, devWin, helpWin]) {
     if (!w || w.isDestroyed()) continue;
     if (w.isVisible()) {
       hiddenSince.delete(w);
@@ -321,6 +322,7 @@ function positionGuide() {
 // 트레이의 "다시 로드" 로 편집을 바로 반영할 수 있게, 캐시를 버리고 매번 다시 읽는다.
 // 파일을 고치다 문법이 깨져도 앱은 살아있어야 하므로 실패는 빈 값으로 넘긴다.
 const CONFERENCE_PATH = require.resolve('./shared/conference');
+const VITALS_CLIENT_PATH = path.join(__dirname, 'integrations', 'vitals-client.js');
 function loadConference() {
   try {
     delete require.cache[CONFERENCE_PATH];
@@ -426,6 +428,107 @@ function createDevWindow() {
     hiddenSince.delete(w);
     if (devWin === w) devWin = null;
   });
+}
+
+// ---------------------------------------------------------------------------
+// 사용 안내 창
+// 처음 실행할 때 저절로 뜨고, "다시 보지 않기" 를 켜고 닫으면 그 뒤로는 트레이
+// 메뉴로만 열린다. 앱 폴더는 설치 방식에 따라 쓸 수 없어서 사용자 폴더에 적어둔다.
+// ---------------------------------------------------------------------------
+const HELP_WIDTH = 460;
+const HELP_HEIGHT = 520; // 가장 긴 페이지가 스크롤 없이 들어가게
+
+function uiStatePath() {
+  return path.join(app.getPath('userData'), 'ui-state.json');
+}
+
+function readUiState() {
+  try {
+    const p = uiStatePath();
+    if (fs.existsSync(p)) return JSON.parse(fs.readFileSync(p, 'utf8'));
+  } catch (e) {
+    console.error('[ui-state] 읽기 실패:', e.message);
+  }
+  return {};
+}
+
+function writeUiState(patch) {
+  try {
+    const next = { ...readUiState(), ...patch };
+    fs.mkdirSync(path.dirname(uiStatePath()), { recursive: true });
+    fs.writeFileSync(uiStatePath(), JSON.stringify(next, null, 2) + '\n');
+  } catch (e) {
+    // 저장에 실패하면 다음에 또 뜨는 것뿐이라 앱을 멈출 이유는 없다
+    console.error('[ui-state] 저장 실패:', e.message);
+  }
+}
+
+function createHelpWindow() {
+  helpWin = new BrowserWindow({
+    width: HELP_WIDTH,
+    height: HELP_HEIGHT,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    hasShadow: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    fullscreenable: false,
+    icon: appIcon(),
+    webPreferences: WEB_PREFS,
+  });
+  helpWin.setAlwaysOnTop(true, 'screen-saver');
+  helpWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  helpWin.loadFile(path.join(__dirname, 'renderer', 'help.html'));
+
+  const w = helpWin;
+  w.on('close', (e) => {
+    if (!app.isQuitting) {
+      e.preventDefault();
+      w.hide();
+    }
+  });
+  w.on('closed', () => {
+    hiddenSince.delete(w);
+    if (helpWin === w) helpWin = null;
+  });
+}
+
+// 화면 한가운데 — 커서가 닿는 영역 기준이라 모니터가 바뀌어도 보이는 곳에 뜬다
+function centerHelp() {
+  if (!helpWin || helpWin.isDestroyed()) return;
+  const wa = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const [hw, hh] = helpWin.getSize();
+  const p = clampedToWorkArea(
+    Math.round(wa.x + (wa.width - hw) / 2),
+    Math.round(wa.y + (wa.height - hh) / 2),
+    hw,
+    hh
+  );
+  safeSetPosition(helpWin, p.x, p.y);
+}
+
+function showHelp() {
+  // 사용 안내 문구는 자주 고치므로, 다시 열 때마다 파일을 새로 읽는다
+  if (helpWin && !helpWin.isDestroyed()) {
+    helpWin.destroy();
+    helpWin = null;
+  }
+  createHelpWindow();
+  centerHelp();
+  helpWin.webContents.once('did-finish-load', () => {
+    helpWin.webContents.send('help:show');
+    helpWin.show();
+  });
+}
+
+function toggleHelp() {
+  if (helpWin && helpWin.isVisible()) {
+    helpWin.hide();
+    return;
+  }
+  showHelp();
 }
 
 function toggleDev() {
@@ -740,10 +843,16 @@ function handleVitals(payload = {}) {
 
   if (dnd) return { ok: true, grade: overall, summary, skipped: 'dnd' };
 
-  // 평가가 그대로면 한동안 다시 말 걸지 않는다
+  // 평가가 그대로면 한동안 다시 말 걸지 않는다. 다만 나빠진 소식은 늦게 알면 쓸모가
+  // 없다 — LCP 처럼 뒤늦게 확정되는 지표가 판정을 뒤집었을 때 막히지 않게 짧게 끊는다.
   const changed = overall !== lastVitalsGrade;
-  const gap = Date.now() - lastVitalsAt;
-  if (gap < (changed ? TIME.VITALS_GAP_CHANGED_MS : TIME.VITALS_GAP_SAME_MS)) {
+  const worse = !lastVitalsGrade || GRADE_RANK[overall] > GRADE_RANK[lastVitalsGrade];
+  const minGap = worse
+    ? TIME.VITALS_GAP_WORSE_MS
+    : changed
+      ? TIME.VITALS_GAP_CHANGED_MS
+      : TIME.VITALS_GAP_SAME_MS;
+  if (Date.now() - lastVitalsAt < minGap) {
     return { ok: true, grade: overall, summary, skipped: 'throttled' };
   }
   lastVitalsGrade = overall;
@@ -794,91 +903,21 @@ function startServer() {
 
     const url = new URL(req.url, `http://localhost:${CONFIG.port}`);
 
-    if (req.method === 'GET' && url.pathname === '/debug/capture') {
-      // 개발용: 창 내용을 PNG로 캡처 (?win=guide 로 안내 패널)
-      const which = url.searchParams.get('win');
-      const doCapture = (target) => {
-        if (target && !target.isDestroyed()) {
-          target.webContents
-            .capturePage()
-            .then((img) => {
-              res.writeHead(200, { 'Content-Type': 'image/png' });
-              res.end(img.toPNG());
-            })
-            .catch((e) => {
-              console.error('[capture] 실패:', e.message);
-              res.writeHead(500);
-              res.end();
-            });
-        } else {
-          res.writeHead(503);
-          res.end();
+    // 측정 스크립트를 앱이 직접 내려준다 — dev 서버가 Vite 가 아니어도(Next·webpack 등)
+    // 이 주소만 페이지에 걸면 되도록. 응답 헤더의 CORS 는 위에서 이미 열어둔다.
+    if (req.method === 'GET' && url.pathname === '/vitals-client.js') {
+      fs.readFile(VITALS_CLIENT_PATH, (err, buf) => {
+        if (err) {
+          res.writeHead(404);
+          return res.end();
         }
-      };
-      if (which === 'guide') {
-        overridePhase = url.searchParams.get('phase') || null; // 개발용 phase 강제
-        const mk = url.searchParams.get('mock');
-        mockNow = mk ? (/^\d+$/.test(mk) ? Number(mk) : new Date(mk).getTime()) : null;
-        if (!guideWin) createGuideWindow();
-        positionGuide();
-        pushGuideData();
-        guideWin.showInactive();
-        setTimeout(() => {
-          doCapture(guideWin);
-          overridePhase = null; // 실제 클릭 시엔 날짜 기반 phase로 복귀
-          mockNow = null;
-        }, 550);
-      } else if (which === 'dev') {
-        if (!devWin) createDevWindow();
-        const wa = screen.getPrimaryDisplay().workArea;
-        safeSetPosition(devWin, wa.x + 40, wa.y + 60);
-        devWin.showInactive();
-        setTimeout(() => doCapture(devWin), 750);
-      } else {
-        doCapture(win);
-      }
+        res.writeHead(200, {
+          'Content-Type': 'application/javascript; charset=utf-8',
+          'Cache-Control': 'no-store',
+        });
+        res.end(buf);
+      });
       return;
-    }
-
-    if (req.method === 'GET' && url.pathname === '/debug/dday') {
-      // 개발용: 클릭 팝업(D-day)을 강제로 띄운다 (실제 더블클릭 대신)
-      sendToMascot('mascot:dday', {});
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ ok: true }));
-    }
-
-    if (req.method === 'GET' && url.pathname === '/debug/pos') {
-      const pos = win && !win.isDestroyed() ? win.getPosition() : null;
-      const guidePos = guideWin && !guideWin.isDestroyed() ? guideWin.getPosition() : null;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(
-        JSON.stringify({
-          pos,
-          walkGoal,
-          walkTarget,
-          guidePos,
-          guidePinned: !!guidePinnedPos,
-          charBox,
-          workArea: screen.getPrimaryDisplay().workArea,
-        })
-      );
-    }
-
-    if (req.method === 'GET' && url.pathname === '/debug/drag') {
-      // 개발용: 마우스 없이 드래그를 흉내내 경계 동작을 확인한다
-      if (url.searchParams.get('start')) mascotDragIntent = null;
-      dragMascot(Number(url.searchParams.get('dx') || 0), Number(url.searchParams.get('dy') || 0));
-      const pos = win && !win.isDestroyed() ? win.getPosition() : null;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ pos }));
-    }
-
-    if (req.method === 'GET' && url.pathname === '/debug/vitals') {
-      // 개발용: 브라우저 없이 지표를 흉내낸다 (?lcp=5200&cls=0.3)
-      const metrics = {};
-      for (const [k, v] of url.searchParams) metrics[k] = v;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(handleVitals({ metrics })));
     }
 
     if (req.method === 'GET' && url.pathname === '/health') {
@@ -984,6 +1023,29 @@ function loadSchedule() {
     .sort((a, b) => new Date(a.time) - new Date(b.time));
 }
 
+// 행사 정보를 고치면 앱을 끄지 않고 반영한다. 편집기가 파일을 지웠다 새로 쓰는 식으로
+// 저장해도 놓치지 않게 파일이 아니라 폴더를 지켜보고, 한 번 저장에 이벤트가 여러 번
+// 오기 때문에 잠깐 모아서 한 번만 다시 읽는다.
+let confWatcher = null;
+let confReloadTimer = null;
+
+function watchConference() {
+  try {
+    confWatcher = fs.watch(path.dirname(CONFERENCE_PATH), (_ev, file) => {
+      if (file !== path.basename(CONFERENCE_PATH)) return;
+      clearTimeout(confReloadTimer);
+      confReloadTimer = setTimeout(() => {
+        console.log('[conference] 바뀐 내용을 다시 읽습니다');
+        armSchedule();
+        pushGuideData();
+      }, TIME.CONF_RELOAD_MS);
+    });
+  } catch (e) {
+    // 지켜보기에 실패해도 앱을 다시 켜면 반영된다 — 기능이 아니라 편의다
+    console.error('[conference] 파일 감시 실패:', e.message);
+  }
+}
+
 // setTimeout 은 약 24.8일(MAX_TIMEOUT_MS)이 넘는 지연을 받으면 오버플로로 즉시 실행된다.
 // 컨퍼런스 일정은 몇 주 뒤가 흔해서 그대로 두면 앱을 켜자마자 알림이 쏟아진다.
 function scheduleAt(delay, fn) {
@@ -1043,18 +1105,7 @@ function trayIcon() {
 
 function buildTrayMenu() {
   return Menu.buildFromTemplate([
-    { label: '👋 인사시키기', click: () => handleEvent('state', { state: 'greet' }) },
-    { label: '📋 안내 패널 열기/닫기', click: () => toggleGuide() },
-    {
-      label: '🔔 테스트 알림',
-      click: () =>
-        handleEvent('notify', {
-          title: '테스트 알림',
-          message: '마스코트가 잘 반응하는지 확인!',
-          level: 'success',
-        }),
-    },
-    { type: 'separator' },
+    { label: '📋 컨퍼런스 안내', click: () => toggleGuide() },
     {
       label: dnd ? '🔕 방해 금지: 켜짐' : '🔔 방해 금지: 꺼짐',
       click: () => {
@@ -1063,22 +1114,8 @@ function buildTrayMenu() {
         rebuildTray();
       },
     },
-    {
-      label: '📍 위치 재정렬',
-      click: () => {
-        if (!win) return;
-        stopWander();
-        const { x, y } = cornerPosition();
-        safeSetPosition(win, x, y);
-        wanderHomeX = x;
-        guidePinnedPos = null; // 옮겨둔 안내 패널도 제자리로 — 다시 따라다닌다
-        if (guideWin && guideWin.isVisible()) positionGuide();
-      },
-    },
-    { label: '🗓 스케줄 다시 로드', click: () => armSchedule() },
-    { label: '🛠 개발자 미리보기 (phase/시간)', click: () => toggleDev() },
+    { label: '📖 사용 안내', click: () => toggleHelp() },
     { type: 'separator' },
-    { label: `🌐 웹훅: http://127.0.0.1:${CONFIG.port}`, enabled: false },
     { label: '종료', click: () => app.quit() },
   ]);
 }
@@ -1099,15 +1136,16 @@ function createTray() {
 // ---------------------------------------------------------------------------
 // 캐릭터 애니메이션 (charactor/*.json — 마름모 아트보드 포맷)
 ipcMain.handle('mascot:getAnims', () => {
+  // 짧은 버전·미리보기 SVG 는 쓰지 않는다 — 롱 애니와 말풍선만 읽어 시작을 가볍게
   const dir = path.join(__dirname, 'charactor');
   const out = {};
   try {
     for (const f of fs.readdirSync(dir)) {
       if (!f.endsWith('.json')) continue;
+      const base = path.basename(f, '.json').normalize('NFC');
+      if (!base.includes('롱') && !base.startsWith('말풍선')) continue;
       try {
-        out[path.basename(f, '.json').normalize('NFC')] = JSON.parse(
-          fs.readFileSync(path.join(dir, f), 'utf8')
-        );
+        out[base] = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
       } catch (e) {
         console.error('[anims] 파싱 실패:', f, e.message);
       }
@@ -1185,30 +1223,39 @@ ipcMain.on('guide:close', () => {
 });
 
 // 패널 드래그 — 커서가 화면 밖으로 나가도 창은 경계에서 멈춘다
-let guideDragIntent = null;
+function attachPanelDrag(channel, getWin, onMoved) {
+  let intent = null;
+  ipcMain.on(`${channel}:dragStart`, () => {
+    intent = null;
+  });
+  ipcMain.on(`${channel}:drag`, (_e, { dx, dy } = {}) => {
+    const w = getWin();
+    if (!w || w.isDestroyed()) return;
+    if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
+    const [ww, wh] = w.getSize();
+    if (!intent) {
+      const [x, y] = w.getPosition();
+      intent = { x, y };
+    }
+    intent = clampedToWorkArea(intent.x + dx, intent.y + dy, ww, wh, DRAG_SLACK);
+    const p = clampedToWorkArea(intent.x, intent.y, ww, wh);
+    if (onMoved) onMoved(p);
+    else safeSetPosition(w, p.x, p.y);
+  });
+}
 
-ipcMain.on('guide:dragStart', () => {
-  guideDragIntent = null;
-});
-ipcMain.on('guide:drag', (_e, { dx, dy } = {}) => {
-  if (!guideWin || guideWin.isDestroyed()) return;
-  if (!Number.isFinite(dx) || !Number.isFinite(dy)) return;
-  const [gw, gh] = guideWin.getSize();
-  if (!guideDragIntent) {
-    const [x, y] = guideWin.getPosition();
-    guideDragIntent = { x, y };
-  }
-  guideDragIntent = clampedToWorkArea(
-    guideDragIntent.x + dx,
-    guideDragIntent.y + dy,
-    gw,
-    gh,
-    DRAG_SLACK
-  );
-  const p = clampedToWorkArea(guideDragIntent.x, guideDragIntent.y, gw, gh);
+attachPanelDrag('guide', () => guideWin, (p) => {
   guidePinnedPos = p;
   moveGuideTo(p.x, p.y);
 });
+attachPanelDrag('help', () => helpWin);
+
+// 사용 안내 — 닫을 때 "다시 보지 않기" 여부를 같이 받는다
+ipcMain.on('help:close', (_e, { dontShowAgain } = {}) => {
+  if (dontShowAgain) writeUiState({ hideHelp: true });
+  if (helpWin && helpWin.isVisible()) helpWin.hide();
+});
+
 ipcMain.on('open:external', (_e, url) => {
   if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
 });
@@ -1282,8 +1329,16 @@ app.whenReady().then(() => {
     clampWindowToScreen(win);
   });
 
+  watchConference();
+
   // 첫 인사
   setTimeout(() => handleEvent('state', { state: 'greet' }), TIME.FIRST_GREET_MS);
+
+  // 처음 깔았을 때는 무엇을 할 수 있는 앱인지 알려준다.
+  // "다시 보지 않기" 를 켜고 닫았다면 트레이 메뉴로만 열린다.
+  if (!readUiState().hideHelp) {
+    setTimeout(showHelp, TIME.HELP_FIRST_SHOW_MS);
+  }
 });
 
 app.on('window-all-closed', () => {
@@ -1302,6 +1357,8 @@ app.on('will-quit', () => {
   if (returnTimer) clearTimeout(returnTimer);
   if (sleepTimer) clearTimeout(sleepTimer);
   if (hiddenSweeper) clearInterval(hiddenSweeper);
+  if (confReloadTimer) clearTimeout(confReloadTimer);
+  if (confWatcher) confWatcher.close();
   scheduledTimers.forEach(cancelScheduled);
   if (server) server.close();
 });

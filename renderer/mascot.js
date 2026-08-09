@@ -36,7 +36,7 @@ const FILE_PREFIX = '스네일-와이드-';
 const ANIM = {
   idle: { file: '갸웃-롱', fps: 0, loop: true }, // 중립 포즈(1프레임) + 바운스
   sleeping: { file: '잠-숨-롱', fps: 4, loop: true },
-  walking: { file: '전진', fps: 10, loop: true },
+  walking: { file: '전진-롱', fps: 10, loop: true },
   working: { file: '갸웃-롱', fps: 6, loop: true },
   happy: { file: '신남-롱', fps: 9, loop: true },
   notify: { file: '놀람-롱', fps: 8, loop: true },
@@ -644,7 +644,7 @@ const CHAT_LINES = [
   '오늘도 화이팅이야 🔥',
   '잠깐 쉬어가도 괜찮아 ☕️',
   '오늘 하루도 수고했어 ✨',
-  '두 번 클릭하면 컨퍼런스 안내를 보여줄게!',
+  '두 번 클릭하면 D-day 를 보여줄게!',
 ];
 let clickTimer = null;
 

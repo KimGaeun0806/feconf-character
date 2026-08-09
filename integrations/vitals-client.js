@@ -1,8 +1,9 @@
 // ===========================================================================
 // vitals-client — 브라우저에서 Core Web Vitals 를 재서 마스코트로 보낸다
 //
-// vite-plugin-mascot 이 dev 서버 페이지에 <script src="/__mascot/vitals-client.js">
-// 로 끼워 넣는다. 빌드 결과물에는 절대 들어가지 않는다.
+// 페이지에 끼워 넣는 방법은 두 가지다. vite-plugin-mascot 이 dev 서버에서 내려주거나,
+// mascot-dev 프록시가 마스코트 앱의 주소를 가리키는 <script> 를 HTML 에 넣어준다.
+// 어느 쪽이든 빌드 결과물에는 절대 들어가지 않는다.
 //
 // 라이브러리 없이 PerformanceObserver 만 쓴다 — 사용자 프로젝트에 의존성을
 // 추가하지 않기 위해서다. 임계값 판정은 마스코트 앱(main.js)이 담당한다.
@@ -14,30 +15,52 @@
   if (window.__mascotVitals) return; // HMR 로 두 번 실행되는 경우 방지
 
   var metrics = {};
-  // 콘솔에서 window.__mascotVitals.metrics 로 지금까지 잡힌 값을 볼 수 있다
+  // 콘솔에서 window.__mascotVitals 로 잡힌 값과 보낼 주소를 확인할 수 있다
   window.__mascotVitals = { metrics: metrics };
 
+  // 스크립트를 어디서 받아왔는지가 보낼 곳을 정한다. dev 서버가 내려줬다면 그 서버가
+  // 중계하므로 상대 경로로, 마스코트 앱에서 바로 받아왔다면 그 앱으로 곧장 보낸다.
   var ENDPOINT = '/__mascot/vitals';
+  try {
+    var src = document.currentScript && document.currentScript.src;
+    if (src) {
+      var origin = new URL(src, location.href).origin;
+      if (origin !== location.origin) ENDPOINT = origin + '/vitals';
+    }
+  } catch (_) {}
+  window.__mascotVitals.endpoint = ENDPOINT;
+
   var SETTLE_MS = 2500; // 지표가 잠잠해지길 기다리는 시간
+  // 첫 보고만 더 기다린다. LCP 는 늦게 그려지는 이미지·폰트·지연 렌더링 때문에 한참 뒤에
+  // 확정되는 일이 흔해서, 서둘러 보내면 아직 그리는 중인 페이지를 '완벽'이라고 알린다.
+  var FIRST_SETTLE_MS = 5000;
   var MIN_INTERVAL_MS = 10000; // 연속 전송 최소 간격
 
   var dirty = false;
   var timer = null;
+  var timerAt = 0; // 예약해 둔 발사 시각
   var lastSentAt = 0;
 
   function set(name, value) {
     if (typeof value !== 'number' || !isFinite(value) || value < 0) return;
     if (metrics[name] === value) return;
+    // 모든 지표는 낮을수록 좋다. 값이 나빠졌다면 앞서 보낸 판정이 틀렸다는 뜻이라
+    // 최소 간격을 기다리지 않고 서둘러 바로잡는다.
+    var worse = metrics[name] != null && value > metrics[name];
     metrics[name] = value;
     dirty = true;
-    schedule();
+    schedule(worse);
   }
 
   // LCP·CLS·INP 는 페이지가 살아있는 내내 갱신된다. 바뀔 때마다 보내면
   // 마스코트가 쉴 새 없이 말을 걸어서, 잠잠해진 뒤 한 번에 모아 보낸다.
-  function schedule() {
-    if (timer) return;
-    var wait = Math.max(SETTLE_MS, MIN_INTERVAL_MS - (Date.now() - lastSentAt));
+  function schedule(urgent) {
+    var settle = lastSentAt ? SETTLE_MS : FIRST_SETTLE_MS;
+    var wait = urgent ? settle : Math.max(settle, MIN_INTERVAL_MS - (Date.now() - lastSentAt));
+    var at = Date.now() + wait;
+    if (timer && timerAt <= at) return; // 이미 더 이르게 잡혀 있다
+    clearTimeout(timer);
+    timerAt = at;
     timer = setTimeout(function () {
       timer = null;
       flush();
@@ -46,14 +69,20 @@
 
   function flush(force) {
     if (!dirty) return;
-    // LCP 없이 보내면 아직 그리는 중인 페이지가 '완벽'으로 판정된다 — 기다린다
-    if (!force && !('LCP' in metrics)) return;
+    // LCP 는 페이지가 다 뜨기 전까지 얼마든지 뒤집힌다. 로드가 끝나기 전에 보내면
+    // 아직 그리는 중인 페이지가 '완벽'으로 판정된다 — 끝난 뒤에 보낸다.
+    if (!force && (!('LCP' in metrics) || document.readyState !== 'complete')) {
+      return schedule();
+    }
     dirty = false;
     lastSentAt = Date.now();
     var body = JSON.stringify({ url: location.pathname, metrics: metrics });
     try {
       if (navigator.sendBeacon) {
-        navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'application/json' }));
+        // text/plain 으로 보낸다 — sendBeacon 은 언제나 credentials 를 싣기 때문에
+        // application/json 이면 사전 요청(preflight)이 걸려 다른 출처로는 막힌다.
+        // 받는 쪽은 Content-Type 을 보지 않고 본문을 JSON 으로 읽는다.
+        navigator.sendBeacon(ENDPOINT, new Blob([body], { type: 'text/plain' }));
       } else {
         fetch(ENDPOINT, {
           method: 'POST',

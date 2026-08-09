@@ -1,7 +1,7 @@
 # 커스텀 가이드 — 기본 제공 셋 스펙 🎨
 
 이 문서는 달팽이를 마음껏 뜯어고치고 싶은 분을 위한 **기본 제공 셋의 스펙 설명서**입니다.
-커스텀 대상은 **아트(캐릭터·말풍선)만이 아니라 일렉트론 앱 전체**입니다 — 창 동작, 상태 머신, 웹훅, 안내 패널, 트레이까지 전부 열려 있어요. 실행·연동 방법은 [README.md](README.md)를 보세요.
+커스텀 대상은 **아트(캐릭터·말풍선)만이 아니라 일렉트론 앱 전체**입니다 — 창 동작, 상태 머신, 웹훅, 컨퍼런스 안내, 트레이까지 전부 열려 있어요. 실행·연동 방법은 [README.md](README.md)를 보세요.
 
 ## 기본 제공 셋 한눈에 보기
 
@@ -26,9 +26,10 @@
 | [preload.js](preload.js) | main ↔ renderer IPC 브릿지 | renderer에 새 기능 노출할 때 |
 | [renderer/mascot.js](renderer/mascot.js) | 캐릭터·말풍선 렌더링, `ANIM`/`BUBBLE_STYLES` 레지스트리 | 애니메이션 fps/매핑, 말풍선 스타일, 바운스 같은 코드 연출 |
 | [renderer/style.css](renderer/style.css) | 마스코트 창 스타일 (레벨 색, 흔들림, 폰트) | 말풍선 텍스트 색, urgent 연출, 새 스타일 테마 |
-| [renderer/guide.html](renderer/guide.html) / [guide.js](renderer/guide.js) / [guide.css](renderer/guide.css) | 안내 패널 (before/dayof/after 3상태) | 패널 스킨, 새 카드/섹션 |
+| [renderer/guide.html](renderer/guide.html) / [guide.js](renderer/guide.js) / [guide.css](renderer/guide.css) | 컨퍼런스 안내 (before/dayof/after 3상태) | 스킨, 새 카드/섹션 |
+| [renderer/help.html](renderer/help.html) / [help.js](renderer/help.js) / [help.css](renderer/help.css) | 사용 안내 (좌우로 넘기는 카드) | 안내 문구·페이지 추가 (`help.js` 의 `PAGES`) |
 | [renderer/dev.html](renderer/dev.html) / [dev.js](renderer/dev.js) | 개발자 미리보기 패널 | 커스텀한 기능의 테스트 버튼 추가 |
-| [integrations/](integrations/) | mascot-watch CLI · Vite 플러그인 · 재사용 클라이언트 | 다른 툴 연동 (webpack, git hook, CI…) |
+| [integrations/](integrations/) | feconf · mascot-watch · mascot-dev CLI · Vite 플러그인 · 재사용 클라이언트 | 다른 툴 연동 (webpack, git hook, CI…) |
 | [scripts/send.js](scripts/send.js) | 웹훅 CLI 헬퍼 | – |
 | [shared/conference.js](shared/conference.js) | 행사 이름·날짜·장소·링크 + 세션 목록 (main 만 읽고 렌더러엔 IPC 로 전달) | 행사 정보, 세션 추가/수정 |
 | [shared/time.js](shared/time.js) | 시간 상수와 날짜 헬퍼 — main 과 렌더러 세 창이 같은 값을 본다 | 잠들기·말풍선·딴짓·산책 타이밍, 프레임 상한 |
@@ -46,7 +47,7 @@
 
 | 무엇 | 어디 |
 | --- | --- |
-| 행사 날짜·장소 | [shared/conference.js](shared/conference.js) 의 `startDate`·`endDate`·`venue` — D-day, 안내 패널, 세션 알림 시각이 모두 여기서 나온다 |
+| 행사 날짜·장소 | [shared/conference.js](shared/conference.js) 의 `startDate`·`endDate`·`venue` — D-day, 컨퍼런스 안내, 세션 알림 시각이 모두 여기서 나온다 |
 | 세션 시각 | 같은 파일의 `sessions` 에 **시:분만** 적고 날짜는 행사 날짜에서 물려받는다 |
 | 기다리는 시간 | [shared/time.js](shared/time.js) — 잠들기, 말풍선 유지, 딴짓 간격, 프레임 상한, Web Vitals 억제 간격 등 |
 
@@ -152,7 +153,7 @@ renderer/mascot.js의 `BUBBLE_STYLES` 스펙:
 ## 확인 루프 (수정 → 눈으로 보기)
 
 1. `npm start`로 실행
-2. **트레이 메뉴 → 🛠 개발자 미리보기** (또는 달팽이 우클릭)
+2. **달팽이 우클릭 → 개발자 미리보기**
 3. 상태 세그먼트/감정 칩으로 **모든 애니메이션 즉시 재생**, 말풍선 스타일·폰트(픽셀/프리텐다드) 토글
 4. JSON을 바꿨으면 앱 재시작 (애니메이션은 시작 시 1회 로드)
 
@@ -178,5 +179,5 @@ node scripts/send.js notify "제목" "메시지가 길면 말풍선이 옆으로
 - **새 상태/행동 추가** — `ANIM`에 상태 등록 후 `POST /state {"state":"내상태"}`로 트리거, main.js 상태 머신에 규칙 추가
 - **새 연동** — [integrations/mascot-client.js](integrations/mascot-client.js) 재사용해서 webpack/git hook/CI/슬랙 무엇이든 웹훅으로 연결
 - **새 웹훅 엔드포인트** — main.js 라우팅에 추가 (예: `POST /pomodoro`로 뽀모도로 타이머)
-- **안내 패널 리스킨** — guide.\* 3파일이 독립적이라 통째로 다른 UI로 교체 가능
+- **컨퍼런스 안내 리스킨** — guide.\* 3파일이 독립적이라 통째로 다른 UI로 교체 가능
 - **창 동작 실험** — 여러 마리 소환, 화면 가장자리 따라 걷기, 다른 모니터 이주 등 main.js에서 자유롭게

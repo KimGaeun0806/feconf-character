@@ -72,11 +72,6 @@ function success(title, message) {
     post('/notify', { title: title || '빌드 완료', message: message || '', level: 'success' })
   );
 }
-function warn(title, message) {
-  return state('idle').then(() =>
-    post('/notify', { title: title || '경고', message: message || '', level: 'warn' })
-  );
-}
 function fail(title, message) {
   return state('idle').then(() =>
     post('/notify', { title: title || '빌드 실패', message: message || '', level: 'urgent' })
@@ -91,5 +86,17 @@ function vitals(payload) {
   return post('/vitals', payload || {});
 }
 
+// 알림을 보내고 나간다. 앱이 응답하지 않아도 graceMs 뒤에는 무조건 끝낸다.
+function exitWhenSent(sending, code, graceMs = 2000) {
+  let done = false;
+  const bye = () => {
+    if (done) return;
+    done = true;
+    process.exit(code);
+  };
+  Promise.resolve(sending).then(bye, bye);
+  setTimeout(bye, graceMs).unref();
+}
+
 // disabled: 전송을 끈 상태인지 — 못 보낸 것과 안 보낸 것을 구분해야 하는 쪽에서 쓴다
-module.exports = { post, state, building, success, warn, fail, ready, vitals, disabled: DISABLED };
+module.exports = { post, state, building, success, fail, ready, vitals, exitWhenSent, disabled: DISABLED };

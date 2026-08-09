@@ -56,22 +56,11 @@ m.building(name);
 // 전송이 끝나거나 이 시간이 지나거나 먼저 오는 쪽을 따른다.
 const EXIT_GRACE_MS = 2000;
 
-function exitWhenSent(sending, code) {
-  let done = false;
-  const bye = () => {
-    if (done) return;
-    done = true;
-    process.exit(code);
-  };
-  sending.then(bye, bye);
-  setTimeout(bye, EXIT_GRACE_MS).unref();
-}
-
 const child = spawn(cmd[0], cmd.slice(1), { stdio: 'inherit', shell: process.platform === 'win32' });
 
 child.on('error', (err) => {
   console.error(`[mascot-watch] 실행 실패: ${err.message}`);
-  exitWhenSent(m.fail('실행 Fail...', `${cmd[0]}: ${err.message}`), 1);
+  m.exitWhenSent(m.fail('실행 Fail...', `${cmd[0]}: ${err.message}`), 1, EXIT_GRACE_MS);
 });
 
 child.on('exit', (code, signal) => {
@@ -80,7 +69,7 @@ child.on('exit', (code, signal) => {
     code === 0
       ? m.success('⭐️ 야호~성공~🎵⭐️', `${name} · ${dur}`)
       : m.fail('작업 Fail...', `${name} · 종료코드 ${code != null ? code : signal} · ${dur}`);
-  exitWhenSent(sending, code == null ? 1 : code);
+  m.exitWhenSent(sending, code == null ? 1 : code, EXIT_GRACE_MS);
 });
 
 // Ctrl+C 등은 자식에게 전달

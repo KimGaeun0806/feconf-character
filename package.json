@@ -5,7 +5,10 @@
   "main": "main.js",
   "bin": {
     "feconf-2026-mascot": "scripts/start-branded-dev.js",
-    "mascot-watch": "integrations/mascot-watch.js"
+    "feconf-2026": "integrations/feconf.js",
+    "feconf": "integrations/feconf.js",
+    "mascot-watch": "integrations/mascot-watch.js",
+    "mascot-dev": "integrations/mascot-dev.js"
   },
   "files": [
     "main.js",
