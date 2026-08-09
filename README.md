@@ -39,10 +39,22 @@
 
 ## 실행
 
+바로 띄워보기 — 클론 없이 한 줄로 실행됩니다. (Electron 바이너리를 내려받으므로 첫 실행은 1~2분 걸려요)
+
 ```bash
+npx github:ewq3167/feconf-character
+```
+
+**캐릭터·말풍선을 직접 뜯어고칠 거라면 클론을 권합니다.** 앱이 애셋과 설정을 프로젝트 폴더에서 읽기 때문에, 클론한 디렉터리가 그대로 작업 공간이 돼요.
+
+```bash
+git clone https://github.com/ewq3167/feconf-character.git
+cd feconf-character
 npm install      # electron 설치
 npm start        # 마스코트 실행
 ```
+
+`charactor/` 의 JSON 을 고치고 앱을 다시 띄우면 바로 반영됩니다 → [CUSTOMIZING.md](CUSTOMIZING.md)
 
 ## 알림 보내기 (웹훅)
 

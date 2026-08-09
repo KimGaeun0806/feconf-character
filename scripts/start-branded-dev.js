@@ -14,6 +14,10 @@ const BRANDED_APP = path.join(OUT_DIR, `${APP_NAME}.app`);
 const ICON_SRC = path.join(ROOT, 'assets', 'icon.icns');
 const PORT = process.env.MASCOT_PORT || 7842;
 
+// 이 값이 켜져 있으면 Electron 이 순수 Node 로 떠서 app·ipcMain 이 undefined 가 되고
+// 앱은 TypeError 만 남기고 죽는다 — 일부 터미널·툴링이 켜두므로 물려주기 전에 지운다.
+delete process.env.ELECTRON_RUN_AS_NODE;
+
 function runQuiet(command, args) {
   return spawnSync(command, args, { stdio: 'ignore' });
 }
@@ -85,7 +89,14 @@ function ensureBrandedApp() {
   return BRANDED_APP;
 }
 
-const brandedApp = ensureBrandedApp();
+// 번들 준비·실행은 아이콘·ditto·plutil·codesign 에 기대는 편의 기능이라 환경에 따라
+// 실패할 수 있다 — 그럴 땐 브랜딩 없이 Electron 으로 직접 띄우고 실행은 막지 않는다.
+let brandedApp = null;
+try {
+  brandedApp = ensureBrandedApp();
+} catch (e) {
+  console.warn(`[mascot] 브랜딩된 앱 번들 준비를 건너뜁니다: ${e.message}`);
+}
 
 if (brandedApp) {
   const health = spawnSync('curl', ['-fsS', `http://127.0.0.1:${PORT}/health`], {
@@ -96,9 +107,13 @@ if (brandedApp) {
     process.exit(0);
   }
 
-  run('/usr/bin/open', ['-n', brandedApp, '--args', ROOT, ...process.argv.slice(2)]);
-  console.log(`${APP_NAME} launched.`);
-  process.exit(0);
+  try {
+    run('/usr/bin/open', ['-n', brandedApp, '--args', ROOT, ...process.argv.slice(2)]);
+    console.log(`${APP_NAME} launched.`);
+    process.exit(0);
+  } catch (e) {
+    console.warn(`[mascot] 앱 번들 실행 실패 — Electron 으로 직접 띄웁니다: ${e.message}`);
+  }
 }
 
 const child = spawn(require('electron'), [ROOT, ...process.argv.slice(2)], {

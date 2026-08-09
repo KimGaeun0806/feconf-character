@@ -1,20 +1,45 @@
 {
-  "name": "clawd-conf-mascot",
+  "name": "feconf-mascot",
   "version": "0.1.0",
   "description": "픽셀아트 데스크탑 달팽이 마스코트 — 빌드/테스트/dev 서버 상태 메이트 (+ 컨퍼런스 안내)",
   "main": "main.js",
   "bin": {
+    "feconf-mascot": "scripts/start-branded-dev.js",
     "mascot-watch": "integrations/mascot-watch.js"
   },
+  "files": [
+    "main.js",
+    "preload.js",
+    "renderer/",
+    "charactor/",
+    "assets/",
+    "integrations/",
+    "scripts/",
+    "conference.json",
+    "schedule.json",
+    "CUSTOMIZING.md",
+    "OVERVIEW.md"
+  ],
   "scripts": {
     "start": "node scripts/start-branded-dev.js",
     "start:raw": "electron .",
     "notify": "node scripts/send.js",
     "watch": "node integrations/mascot-watch.js"
   },
+  "keywords": [
+    "electron",
+    "mascot",
+    "pixel-art",
+    "desktop-pet",
+    "vite-plugin",
+    "feconf"
+  ],
   "author": "",
   "license": "MIT",
-  "devDependencies": {
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
     "electron": "^33.2.0"
   }
 }
