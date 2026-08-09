@@ -124,16 +124,23 @@ function safeSetPosition(w, x, y) {
   w.setPosition(Math.round(x), Math.round(y));
 }
 
+// 창이 통째로 보이도록 좌표를 화면 안쪽으로 밀어넣는다
+function clampedToWorkArea(x, y, w, h) {
+  const wa = screen.getDisplayNearestPoint({ x, y }).workArea;
+  return {
+    x: Math.max(wa.x, Math.min(x, wa.x + wa.width - w)),
+    y: Math.max(wa.y, Math.min(y, wa.y + wa.height - h)),
+  };
+}
+
 // 모니터를 빼거나 해상도가 바뀌면 창이 보이지 않는 좌표에 남는다 — 커서가 닿을 수
 // 있는 영역으로 되돌린다. 트레이의 '위치 재정렬' 을 모르면 되찾을 방법이 없다.
 function clampWindowToScreen(w) {
   if (!w || w.isDestroyed()) return;
   const [x, y] = w.getPosition();
   const [ww, wh] = w.getSize();
-  const wa = screen.getDisplayNearestPoint({ x, y }).workArea;
-  const nx = Math.max(wa.x, Math.min(x, wa.x + wa.width - ww));
-  const ny = Math.max(wa.y, Math.min(y, wa.y + wa.height - wh));
-  if (nx !== x || ny !== y) safeSetPosition(w, nx, ny);
+  const p = clampedToWorkArea(x, y, ww, wh);
+  if (p.x !== x || p.y !== y) safeSetPosition(w, p.x, p.y);
 }
 
 function createWindow() {
@@ -239,16 +246,24 @@ function createGuideWindow() {
   });
 
   // 우리가 옮긴 좌표가 아니면 사용자가 헤더를 잡고 끈 것 — 그 자리를 기억한다
+  let settle = null;
   const onMoved = () => {
     if (w.isDestroyed()) return;
     const [x, y] = w.getPosition();
     if (guideAutoPos && x === guideAutoPos.x && y === guideAutoPos.y) return;
     guidePinnedPos = { x, y };
+    // 움직임이 멎으면 화면 안으로 되돌린다
+    if (settle) clearTimeout(settle);
+    settle = setTimeout(() => {
+      settle = null;
+      keepGuideOnScreen();
+    }, 150);
   };
   w.on('moved', onMoved); // macOS 는 드래그가 끝날 때 한 번
   w.on('move', onMoved); // 그 외 플랫폼
 
   w.on('closed', () => {
+    if (settle) clearTimeout(settle);
     hiddenSince.delete(w);
     if (guideWin === w) guideWin = null;
   });
@@ -265,9 +280,23 @@ function moveGuideTo(x, y) {
   safeSetPosition(guideWin, x, y);
 }
 
+// 끌어서 화면 밖으로 내보낼 수 없게 — 놓고 나면 보이는 영역 안으로 되돌린다.
+// 끄는 도중에 되돌리면 커서와 싸우므로 움직임이 멎은 뒤에 손본다.
+function keepGuideOnScreen() {
+  if (!guideWin || guideWin.isDestroyed()) return;
+  const [x, y] = guideWin.getPosition();
+  const [gw, gh] = guideWin.getSize();
+  const p = clampedToWorkArea(x, y, gw, gh);
+  guidePinnedPos = p;
+  if (p.x !== x || p.y !== y) moveGuideTo(p.x, p.y);
+}
+
 function positionGuide() {
   if (!win || !guideWin) return;
   if (guidePinnedPos) {
+    // 옮겨둔 자리도 화면 밖일 수 있다 — 모니터가 바뀌었다면 안쪽으로 당긴다
+    const [gw, gh] = guideWin.getSize();
+    guidePinnedPos = clampedToWorkArea(guidePinnedPos.x, guidePinnedPos.y, gw, gh);
     const [cx, cy] = guideWin.getPosition();
     if (cx !== guidePinnedPos.x || cy !== guidePinnedPos.y) {
       moveGuideTo(guidePinnedPos.x, guidePinnedPos.y); // 다시 만들어진 창을 그 자리로
