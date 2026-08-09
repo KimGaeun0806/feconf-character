@@ -173,6 +173,35 @@ function createWindow() {
 }
 
 // ---------------------------------------------------------------------------
+// 숨긴 창 정리
+// 창을 숨겨도 렌더러 프로세스는 통째로 남아 60MB 남짓을 계속 붙잡는다. 안내 패널과
+// 개발자 창은 어쩌다 한 번 여는 것이라, 한동안 닫혀 있으면 버리고 다음에 다시 만든다.
+// ---------------------------------------------------------------------------
+// show/hide 이벤트는 showInactive()·hide() 로 여닫을 때 오지 않아 믿을 수 없다.
+// 값이 정확한 isVisible() 을 주기적으로 들여다본다.
+const HIDDEN_DESTROY_MS = 5 * 60000;
+const HIDDEN_SWEEP_MS = 30000;
+const hiddenSince = new Map();
+let hiddenSweeper = null;
+
+function sweepHiddenWindows() {
+  for (const w of [guideWin, devWin]) {
+    if (!w || w.isDestroyed()) continue;
+    if (w.isVisible()) {
+      hiddenSince.delete(w);
+      continue;
+    }
+    const since = hiddenSince.get(w);
+    if (since == null) {
+      hiddenSince.set(w, Date.now());
+    } else if (Date.now() - since >= HIDDEN_DESTROY_MS) {
+      hiddenSince.delete(w);
+      w.destroy(); // 참조는 'closed' 에서 비운다
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 안내 패널 창
 // ---------------------------------------------------------------------------
 function createGuideWindow() {
@@ -198,12 +227,20 @@ function createGuideWindow() {
   guideWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   guideWin.loadFile(path.join(__dirname, 'renderer', 'guide.html'));
 
+  // 창은 지웠다 다시 만들 수 있다 — 핸들러는 모듈 변수 대신 자기 창을 붙잡는다
+  const w = guideWin;
+
   // 닫기 대신 숨김 (앱은 계속 상주)
-  guideWin.on('close', (e) => {
+  w.on('close', (e) => {
     if (!app.isQuitting) {
       e.preventDefault();
-      guideWin.hide();
+      w.hide();
     }
+  });
+
+  w.on('closed', () => {
+    hiddenSince.delete(w);
+    if (guideWin === w) guideWin = null;
   });
 }
 
@@ -320,15 +357,22 @@ function createDevWindow() {
   });
   devWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   devWin.loadFile(path.join(__dirname, 'renderer', 'dev.html'));
-  devWin.on('close', (e) => {
+  const w = devWin;
+
+  w.on('close', (e) => {
     if (!app.isQuitting) {
       e.preventDefault();
-      devWin.hide();
+      w.hide();
       // 창을 닫으면 실시간으로 복귀
       overridePhase = null;
       mockNow = null;
       pushGuideData();
     }
+  });
+
+  w.on('closed', () => {
+    hiddenSince.delete(w);
+    if (devWin === w) devWin = null;
   });
 }
 
@@ -940,6 +984,7 @@ app.whenReady().then(() => {
   armSchedule();
   scheduleSleep();
   scheduleWander();
+  hiddenSweeper = setInterval(sweepHiddenWindows, HIDDEN_SWEEP_MS);
 
   // 전역 단축키
   globalShortcut.register('CommandOrControl+Shift+M', () => {
@@ -986,5 +1031,6 @@ app.on('will-quit', () => {
   stopWander();
   if (wanderTimer) clearTimeout(wanderTimer);
   if (returnTimer) clearTimeout(returnTimer);
+  if (hiddenSweeper) clearInterval(hiddenSweeper);
   if (server) server.close();
 });
