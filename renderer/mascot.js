@@ -540,14 +540,14 @@ if (cbClose) {
 }
 
 // "FECONF까지 D-XX" / 당일 "D-DAY" / 이후 "FECONF 종료ㅠㅠ"
-// 행사 이름은 shared/conference.js 의 shortName(없으면 name)에서 가져온다.
+// 행사 이름은 shared/conference.js 의 shortName 에서 가져온다.
 function setDdayContent(conf, now) {
-  const s = conf.startDate || conf.date;
+  const s = conf.startDate;
   if (!s) {
     cbDday.textContent = '';
     return;
   }
-  const label = conf.shortName || conf.name || '행사';
+  const label = conf.shortName || '행사';
   const diff = TIME.daysUntil(now, s);
   if (diff < 0) {
     cbDday.textContent = `${label} 종료ㅠㅠ`;

@@ -337,8 +337,8 @@ function effNow() {
 // 자정 기준 날짜 비교로 phase 결정
 function conferencePhase(conf) {
   if (overridePhase) return overridePhase;
-  const start = TIME.startOfDay(conf.startDate || conf.date);
-  const end = TIME.startOfDay(conf.endDate || conf.startDate || conf.date);
+  const start = TIME.startOfDay(conf.startDate);
+  const end = TIME.startOfDay(conf.endDate || conf.startDate);
   const today = TIME.startOfDay(effNow());
   if (isNaN(start)) return 'dayof';
   if (today < start) return 'before';
@@ -352,7 +352,7 @@ function guideData() {
     items: loadSchedule(),
     conference: conf,
     phase: conferencePhase(conf),
-    title: CONFIG.guideTitle || conf.name || '컨퍼런스 안내',
+    title: CONFIG.guideTitle || '컨퍼런스 안내',
     subtitle: CONFIG.guideSubtitle,
     now: effNow(),
   };
@@ -957,7 +957,7 @@ function resolveSessionTime(item, conf) {
   if (!raw) return NaN;
   if (!/^\d{1,2}:\d{2}$/.test(raw)) return new Date(raw).getTime();
 
-  const base = TIME.startOfDay(conf.startDate || conf.date);
+  const base = TIME.startOfDay(conf.startDate);
   if (isNaN(base)) return NaN;
   const [h, m] = raw.split(':').map(Number);
   const d = new Date(base);

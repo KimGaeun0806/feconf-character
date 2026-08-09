@@ -238,7 +238,6 @@ curl -X POST localhost:7842/vitals \
 
 ```js
 module.exports = {
-  name: '우리 컨퍼런스 2026',
   shortName: 'FECONF', // D-day 팝업 문구: "FECONF까지 D-62"
   startDate: '2026-10-10',
   endDate: '2026-10-10',
@@ -251,7 +250,7 @@ module.exports = {
 };
 ```
 
-**행사 날짜는 여기가 유일한 출처입니다.** `startDate` 한 줄만 고치면 D-day·안내 패널·세션 알림 시각이 모두 따라옵니다. `shortName` 은 마스코트 클릭 시 뜨는 D-day 팝업 문구(`FECONF까지 D-62`)에 쓰이고, 없으면 `name` 을 씁니다.
+**행사 날짜는 여기가 유일한 출처입니다.** `startDate` 한 줄만 고치면 D-day·안내 패널·세션 알림 시각이 모두 따라옵니다. `shortName` 은 마스코트 클릭 시 뜨는 D-day 팝업 문구(`FECONF까지 D-62`)에 쓰입니다. 안내 패널 헤더 문구는 행사 이름과 무관하게 `config.json` 의 `guideTitle` 로 정합니다.
 
 `before`/`after`에서 Discord 카드와 후기 버튼을 누르면 기본 브라우저로 링크가 열립니다.
 

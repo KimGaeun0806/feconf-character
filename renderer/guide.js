@@ -56,14 +56,14 @@ function fmtDate(ds) {
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} (${WD[d.getDay()]})`;
 }
 function dateRange(conf) {
-  const s = conf.startDate || conf.date;
+  const s = conf.startDate;
   const e = conf.endDate || s;
   if (!s) return '';
   if (startOfDay(s) === startOfDay(e)) return fmtDate(s);
   return `${fmtDate(s)} ~ ${fmtDate(e)}`;
 }
 function ddayCount(conf) {
-  return TIME.daysUntil(simNow(), conf.startDate || conf.date);
+  return TIME.daysUntil(simNow(), conf.startDate);
 }
 function fmtEta(ms) {
   const min = Math.round(ms / TIME.MIN);
@@ -206,7 +206,7 @@ function renderAfter(conf) {
 // -------------------- 렌더 디스패치 --------------------
 function render() {
   const conf = data.conference || {};
-  titleEl.textContent = data.title || conf.name || '컨퍼런스 안내';
+  titleEl.textContent = data.title || '컨퍼런스 안내';
   contentEl.innerHTML = '';
   contentEl.className = 'phase-' + (data.phase || 'dayof');
 
