@@ -41,11 +41,12 @@
 
 | 메서드/경로 | 바디 | 동작 |
 | --- | --- | --- |
-| `POST /notify` | `{title, message, level}` | 말풍선 + OS 알림 + 캐릭터 반응. level: `info`·`success`·`warn`·`urgent`(흔들림+오래 표시) |
+| `POST /notify` | `{title, message, level, reaction}` | 말풍선 + OS 알림 + 캐릭터 반응. level: `info`·`success`·`warn`·`urgent`(흔들림+오래 표시). `reaction`으로 반응 표정 직접 지정 (`love`·`curious` 등) |
 | `POST /activity` | `{state}` | 사용자 활동 신호 → 작업중/걷기 |
 | `POST /state` | `{state, ttl}` | 임의 상태 강제 (ttl ms 후 복귀) — **`ANIM`에 등록한 커스텀 상태도 이걸로 트리거** |
+| `POST /vitals` | `{url, metrics:{LCP, INP, CLS, FCP, TTFB}}` | Core Web Vitals 판정 → 기준 이내면 사랑, 넘기면 갸웃. 임계값은 main.js의 `VITALS` |
 | `GET /health` | – | 상태 확인 |
-| `GET /debug/capture` · `/debug/pos` | – | 스크린샷/위치 (디버그) |
+| `GET /debug/capture` · `/debug/pos` · `/debug/vitals` | – | 스크린샷/위치/지표 흉내 (디버그) |
 
 `config.json`에 `token`을 넣으면 `x-token` 헤더 필요. 새 엔드포인트는 main.js의 `http.createServer` 라우팅에 추가하면 됩니다.
 

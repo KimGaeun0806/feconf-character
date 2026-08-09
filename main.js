@@ -678,6 +678,7 @@ function handleEvent(kind, data = {}) {
       title: data.title || '알림',
       message: data.message || '',
       level: data.level || 'info', // info | success | warn | urgent
+      reaction: data.reaction, // 지정하면 기본 반응 대신 이 표정 (ANIM 등록된 이름)
     });
     if (!dnd) {
       try {
@@ -692,6 +693,99 @@ function handleEvent(kind, data = {}) {
   } else if (kind === 'state') {
     sendToMascot('mascot:state', { state: data.state, ttl: data.ttl });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Web Vitals 피드백 — dev 서버에서 띄운 페이지의 실측 지표에 마스코트가 반응한다
+// ---------------------------------------------------------------------------
+// 임계값은 web.dev 의 Core Web Vitals 기준. good 이하 / poor 초과 사이가 '개선 필요'.
+const VITALS = {
+  LCP: { good: 2500, poor: 4000 },
+  INP: { good: 200, poor: 500 },
+  CLS: { good: 0.1, poor: 0.25 },
+  FCP: { good: 1800, poor: 3000 },
+  TTFB: { good: 800, poor: 1800 },
+};
+const VITAL_ORDER = ['LCP', 'INP', 'CLS', 'FCP', 'TTFB'];
+const GRADE_RANK = { good: 0, ni: 1, poor: 2 };
+
+// 같은 평가가 반복될 땐 조용히, 평가가 바뀌었을 땐 빠르게 알려준다.
+// 저장할 때마다 페이지가 새로고침되는 dev 환경에선 이 간격이 없으면 말풍선만 뜬다.
+const VITALS_GAP_SAME_MS = 60000;
+const VITALS_GAP_CHANGED_MS = 6000;
+let lastVitalsGrade = null;
+let lastVitalsAt = 0;
+
+function formatVital(name, value) {
+  if (name === 'CLS') return value.toFixed(3);
+  return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${Math.round(value)}ms`;
+}
+
+function gradeVitals(metrics = {}) {
+  const graded = [];
+  for (const name of VITAL_ORDER) {
+    // 브라우저가 보내는 키 대소문자를 가리지 않는다
+    const raw = metrics[name] != null ? metrics[name] : metrics[name.toLowerCase()];
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0) continue;
+    const t = VITALS[name];
+    graded.push({
+      name,
+      value,
+      grade: value <= t.good ? 'good' : value > t.poor ? 'poor' : 'ni',
+    });
+  }
+  return graded;
+}
+
+function handleVitals(payload = {}) {
+  const metrics = payload.metrics && typeof payload.metrics === 'object' ? payload.metrics : payload;
+  const graded = gradeVitals(metrics);
+  if (!graded.length) return { ok: false, error: 'no known metrics' };
+
+  const worst = graded.reduce((a, b) => (GRADE_RANK[b.grade] > GRADE_RANK[a.grade] ? b : a));
+  const overall = worst.grade;
+  const summary = graded.map((g) => `${g.name} ${formatVital(g.name, g.value)}`).join(' · ');
+  console.log(`[vitals] ${overall} — ${summary}${payload.url ? ` (${payload.url})` : ''}`);
+
+  if (dnd) return { ok: true, grade: overall, summary, skipped: 'dnd' };
+
+  // 평가가 그대로면 한동안 다시 말 걸지 않는다
+  const changed = overall !== lastVitalsGrade;
+  const gap = Date.now() - lastVitalsAt;
+  if (gap < (changed ? VITALS_GAP_CHANGED_MS : VITALS_GAP_SAME_MS)) {
+    return { ok: true, grade: overall, summary, skipped: 'throttled' };
+  }
+  lastVitalsGrade = overall;
+  lastVitalsAt = Date.now();
+
+  // 루트 경로는 알려줘봤자 정보가 없다 — 여러 페이지를 오갈 때만 어디였는지 밝힌다
+  const where = payload.url && payload.url !== '/' ? String(payload.url).slice(0, 40) : '';
+  let title;
+  let message;
+  let level;
+  let reaction;
+  if (overall === 'good') {
+    title = '💯 Web Vitals 완벽!';
+    message = summary;
+    level = 'success';
+    reaction = 'love';
+  } else {
+    const others = graded.filter((g) => g.grade !== 'good' && g !== worst).length;
+    const limit = formatVital(worst.name, VITALS[worst.name].good);
+    title = overall === 'poor' ? '🐌 많이 느려졌어요' : '🤔 조금 아쉬워요';
+    message =
+      `${worst.name} ${formatVital(worst.name, worst.value)} · 기준 ${limit} 이하` +
+      (others ? ` 외 ${others}개` : '') +
+      (where ? ` · ${where}` : '');
+    level = overall === 'poor' ? 'warn' : 'info';
+    reaction = 'curious';
+  }
+
+  // 저장할 때마다 시스템 알림이 쌓이면 성가시다 — 말풍선으로만 알려준다
+  scheduleSleep();
+  sendToMascot('mascot:notify', { title, message, level, reaction });
+  return { ok: true, grade: overall, summary };
 }
 
 // ---------------------------------------------------------------------------
@@ -789,6 +883,14 @@ function startServer() {
       return res.end(JSON.stringify({ pos }));
     }
 
+    if (req.method === 'GET' && url.pathname === '/debug/vitals') {
+      // 개발용: 브라우저 없이 지표를 흉내낸다 (?lcp=5200&cls=0.3)
+      const metrics = {};
+      for (const [k, v] of url.searchParams) metrics[k] = v;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(handleVitals({ metrics })));
+    }
+
     if (req.method === 'GET' && url.pathname === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       return res.end(JSON.stringify({ ok: true, dnd, version: app.getVersion() }));
@@ -832,6 +934,10 @@ function startServer() {
         handleEvent('activity', data);
       } else if (url.pathname === '/state') {
         handleEvent('state', data);
+      } else if (url.pathname === '/vitals') {
+        const result = handleVitals(data);
+        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(result));
       } else {
         res.writeHead(404, { 'Content-Type': 'application/json' });
         return res.end(JSON.stringify({ ok: false, error: 'unknown endpoint' }));

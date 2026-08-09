@@ -81,5 +81,10 @@ function fail(title, message) {
 function ready(title, message) {
   return post('/notify', { title: title || 'dev 서버 준비 완료', message: message || '', level: 'success' });
 }
+// Core Web Vitals 실측값 — { metrics: { LCP, INP, CLS, ... }, url }
+// 좋고 나쁨의 판정과 표정 선택은 마스코트 앱이 한다
+function vitals(payload) {
+  return post('/vitals', payload || {});
+}
 
-module.exports = { post, state, building, success, warn, fail, ready };
+module.exports = { post, state, building, success, warn, fail, ready, vitals };

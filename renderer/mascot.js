@@ -417,14 +417,14 @@ function drawCat(now) {
 // ===========================================================================
 let bubbleTimer = null;
 
-function showBubble({ title, message, level, duration, react = true }) {
+function showBubble({ title, message, level, duration, react = true, reaction }) {
   // D-day 클릭 팝업이 떠 있으면 먼저 빠르게 닫고, 사라진 뒤 상태메시지 표시
   if (clickBubble && !clickBubble.classList.contains('hidden')) {
     clickBubble.classList.add('closing');
     setTimeout(() => {
       clickBubble.classList.add('hidden');
       clickBubble.classList.remove('closing');
-      showBubble({ title, message, level, duration, react });
+      showBubble({ title, message, level, duration, react, reaction });
     }, 160);
     return;
   }
@@ -446,7 +446,10 @@ function showBubble({ title, message, level, duration, react = true }) {
   // (클릭 대화 버블은 이미 인사 중이라 react:false 로 건너뜀)
   if (react) {
     setTemp('notify', 1600);
-    if (level === 'urgent' || level === 'warn') {
+    if (reaction && ANIM[reaction]) {
+      // 보낸 쪽이 표정을 지정한 경우 (Web Vitals 결과 등)
+      setTimeout(() => setTemp(reaction, 3000), 1600);
+    } else if (level === 'urgent' || level === 'warn') {
       setTimeout(() => setTemp('notify', 2800), 1600);
     } else {
       setTimeout(() => setTemp('happy', 1800), 1600);
