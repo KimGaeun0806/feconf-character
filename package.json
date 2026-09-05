@@ -1,6 +1,6 @@
 {
   "name": "feconf-26-mascot",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Desktop pixel-art snail mascot for FE builds, tests, and Web Vitals — plus FECONF conference cues (Electron)",
   "main": "main.js",
   "bin": {
