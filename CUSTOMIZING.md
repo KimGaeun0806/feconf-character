@@ -1,14 +1,14 @@
-# 커스텀 가이드 — 기본 제공 셋 스펙 🎨
+# 커스터마이징 가이드 — 기본 제공 셋 스펙
 
-이 문서는 달팽이를 마음껏 뜯어고치고 싶은 분을 위한 **기본 제공 셋의 스펙 설명서**입니다.
-커스텀 대상은 **아트(캐릭터·말풍선)만이 아니라 일렉트론 앱 전체**입니다 — 창 동작, 상태 머신, 웹훅, 컨퍼런스 안내, 트레이까지 전부 열려 있어요. 실행·연동 방법은 [README.md](README.md)를 보세요.
+이 문서는 캐릭터·앱을 **커스터마이징**할 때 참고하는 **기본 제공 셋 스펙**입니다.
+수정 범위는 아트(캐릭터·말풍선)뿐 아니라 Electron 앱 전체 — 창 동작, 상태 머신, 웹훅, 컨퍼런스 안내, 트레이 — 입니다. 실행·연동 방법은 [README.md](README.md)를 보세요.
 
 ## 기본 제공 셋 한눈에 보기
 
 | 구성 | 내용 | 위치 |
 | --- | --- | --- |
 | 캐릭터 애니메이션 | 스네일(달팽이) 1종 × 감정 9종 × short/long 2버전 = **JSON 18개** | [character/](character/) `snail-wide-*.json` |
-| 미리보기 | 각 애니메이션의 첫 프레임 SVG (앱은 사용 안 함, 눈으로 고를 때용) | [character/](character/) `*-preview.svg` |
+| 미리보기 | 각 애니메이션의 첫 프레임 SVG (런타임 미사용, 에셋 선택용) | [character/](character/) `*-preview.svg` |
 | 말풍선 | JSON 픽셀 말풍선 3종(comic/purple/cozy) + 기본 SVG 생각풍선(classic) | [character/](character/) `bubble-*.json` |
 | 폰트 | MonaS12(픽셀, 기본) · Pretendard | [renderer/fonts/](renderer/fonts/) |
 | 컨퍼런스 정보 | 행사 이름·날짜·장소·링크 + 세션 목록 | [shared/conference.js](shared/conference.js) |
@@ -108,7 +108,7 @@ setTimeout(hideBubble, TIME.BUBBLE_MS); // 6.5초
 ## 캐릭터: 파일 네이밍이 곧 API
 
 앱은 시작 시 `character/*.json`을 읽고, **`snail-wide-<emotion>[-long].json` 이름으로 찾아 씁니다.**
-같은 이름으로 파일만 갈아끼우면 **코드 수정 0줄로 캐릭터가 바뀝니다.** (프리픽스 `snail-wide-`는 renderer/mascot.js의 `FILE_PREFIX`)
+같은 이름으로 파일만 교체하면 **코드 수정 없이 캐릭터가 바뀝니다.** (프리픽스 `snail-wide-`는 renderer/mascot.js의 `FILE_PREFIX`)
 
 앱이 실제 재생하는 파일과 스펙:
 
@@ -149,7 +149,7 @@ renderer/mascot.js의 `BUBBLE_STYLES` 스펙:
 
 **새 말풍선 추가하기**: ① 말풍선 JSON을 그려서 `character/`에 넣고 ② `BUBBLE_STYLES`에 한 줄 추가 ③ 텍스트 색이 필요하면 [renderer/style.css](renderer/style.css)에 `#bubble.style-<이름>` 블록 추가 (기존 3종 참고). 레벨별 연출(`urgent` 흔들림 등)은 스타일과 무관하게 공통 적용됩니다.
 
-## 확인 루프 (수정 → 눈으로 보기)
+## 검증 절차
 
 1. `npm start`로 실행
 2. 트레이에서 **사용 안내** / **컨퍼런스 안내**로 UI 확인
@@ -162,21 +162,21 @@ node scripts/send.js state happy
 
 4. JSON을 바꿨으면 앱 재시작 (애니메이션은 시작 시 1회 로드)
 
-## 커스텀 아이디어
+## 커스터마이징 예시
 
-아트만 바꿔도 되고, 앱을 통째로 뜯어도 됩니다:
+아트만 교체하거나, 앱 동작을 확장할 수 있습니다.
 
-**아트 쪽**
+**아트**
 
-- **캐릭터 갈아끼우기** — 감정 9종 파일명만 지키면 고양이든 문어든 코드 수정 없이 교체
-- **프레임 추가/속도 조절** — pages 배열에 페이지 추가, `ANIM`에서 fps 조절
-- **말풍선 4번째 스타일** — JSON 1개 + `BUBBLE_STYLES` 1줄
-- **팔레트 스왑** — grid는 hex 문자열 배열이라 스크립트로 일괄 치환하면 컬러 바리에이션 순삭
+- **캐릭터 교체** — 감정 9종 파일명 규칙만 지키면 코드 수정 없이 교체 가능
+- **프레임 추가 / 속도 조절** — pages 배열에 페이지 추가, `ANIM`에서 fps 조절
+- **말풍선 스타일 추가** — JSON 1개 + `BUBBLE_STYLES` 1줄
+- **팔레트 변경** — grid는 hex 문자열 배열이므로 스크립트로 일괄 치환 가능
 
-**앱 쪽**
+**앱**
 
 - **새 상태/행동 추가** — `ANIM`에 상태 등록 후 `POST /state {"state":"내상태"}`로 트리거, main.js 상태 머신에 규칙 추가
-- **새 연동** — [integrations/mascot-client.js](integrations/mascot-client.js) 재사용해서 webpack/git hook/CI/슬랙 무엇이든 웹훅으로 연결
-- **새 웹훅 엔드포인트** — main.js 라우팅에 추가 (예: `POST /pomodoro`로 뽀모도로 타이머)
-- **컨퍼런스 안내 리스킨** — guide.\* 3파일이 독립적이라 통째로 다른 UI로 교체 가능
-- **창 동작 실험** — 여러 마리 소환, 화면 가장자리 따라 걷기, 다른 모니터 이주 등 main.js에서 자유롭게
+- **새 연동** — [integrations/mascot-client.js](integrations/mascot-client.js)를 재사용해 webpack / git hook / CI / Slack 등과 웹훅으로 연결
+- **새 웹훅 엔드포인트** — [lib/webhook-server.js](lib/webhook-server.js) 라우팅에 추가
+- **컨퍼런스 안내 UI** — guide.\* 파일을 수정하거나 교체
+- **창 동작** — main.js에서 위치·다중 인스턴스·모니터 이동 등 확장

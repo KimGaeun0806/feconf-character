@@ -33,7 +33,7 @@ npx feconf-26-mascot
 패키지 소스가 있는 폴더 안에서는 로컬 이름과 겹칠 수 있습니다.  
 `npx`로 받을 때는 **다른 디렉터리**에서 실행하세요.
 
-클론해서 뜯어고칠 때:
+클론 후 로컬에서 수정할 때:
 
 ```bash
 git clone https://github.com/KimGaeun0806/feconf-character.git
@@ -240,9 +240,9 @@ node scripts/send.js state sleeping
 
 ---
 
-## 뜯어고치기
+## 커스터마이징
 
-`npx` / `npm i`만으로는 애셋이 내 폴더에 남지 않습니다. 캐릭터를 바꾸려면 클론하세요.
+`npx` / `npm i`만으로는 애셋이 프로젝트 폴더에 복사되지 않습니다. 캐릭터·UI를 수정하려면 저장소를 클론하세요.
 
 - 애셋: `character/` — `snail-wide-*.json`, `bubble-*.json`
 - 규칙: `snail-wide-<emotion>[-long].json`
