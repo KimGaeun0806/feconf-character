@@ -18,6 +18,7 @@ const fs = require('fs');
 const TIME = require('./shared/time'); // 기다리는 시간·날짜 계산은 렌더러와 같은 값을 쓴다
 const {
   ROOT,
+  APP_NAME,
   loadConfig,
   appIcon,
   applyAppBranding,
@@ -38,6 +39,13 @@ process.on('unhandledRejection', (reason) => {
 });
 
 const CONFIG = loadConfig();
+
+// 두 번째 실행은 웹훅 포트를 못 잡고 "달팽이만 있고 반응 없음"이 된다 — 한 인스턴스만 살린다.
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+if (!gotSingleInstanceLock) {
+  console.log(`${APP_NAME} is already running.`);
+  app.quit();
+}
 
 let win = null;
 let guideWin = null;
@@ -683,7 +691,9 @@ function handleEvent(kind, data = {}) {
     // 타이핑/코딩 등 사용자 활동 → 반대 모서리로 걸어감 (멈추면 복귀)
     startCodingWalk(data);
   } else if (kind === 'state') {
-    sendToMascot('mascot:state', { state: data.state, ttl: data.ttl });
+    // 파일명·문서의 surprise 와 런타임 상태 notify 를 같은 것으로 본다
+    const state = data.state === 'surprise' ? 'notify' : data.state;
+    sendToMascot('mascot:state', { state, ttl: data.ttl });
   }
 }
 
@@ -706,6 +716,15 @@ function startServer() {
     handleEvent,
     handleVitals,
     vitalsClientPath: VITALS_CLIENT_PATH,
+    onListenError: (e) => {
+      if (e && e.code === 'EADDRINUSE') {
+        console.error(
+          `[server] 포트 ${CONFIG.port} 이(가) 이미 사용 중입니다. ` +
+            `다른 마스코트/프로세스를 끄거나 MASCOT_PORT·config.json 의 port 를 바꾸세요.`
+        );
+        app.quit();
+      }
+    },
   });
 }
 
@@ -964,55 +983,68 @@ ipcMain.on('open:external', (_e, url) => {
 // ---------------------------------------------------------------------------
 // 앱 라이프사이클
 // ---------------------------------------------------------------------------
-app.whenReady().then(() => {
-  applyAppBranding();
-  if (process.platform === 'darwin' && app.dock) app.dock.hide(); // 독 아이콘 숨김
-  createWindow();
-  createTray();
-  startServer();
-  armSchedule();
-  scheduleSleep();
-  scheduleWander();
-  hiddenSweeper = setInterval(sweepHiddenWindows, TIME.HIDDEN_SWEEP_MS);
-
-  // 전역 단축키
-  globalShortcut.register('CommandOrControl+Shift+M', () => {
-    if (!win) return;
-    if (win.isVisible()) win.hide();
-    else win.show();
+if (gotSingleInstanceLock) {
+  app.on('second-instance', () => {
+    if (win && !win.isDestroyed()) {
+      if (!win.isVisible()) win.show();
+      handleEvent('state', { state: 'greet' });
+    }
   });
-  globalShortcut.register('CommandOrControl+Shift+H', () =>
-    handleEvent('state', { state: 'greet' })
-  );
 
-  const onDisplayChange = () => {
-    stopWander();
-    clampWindowToScreen(win);
-    wanderHomeX = null; // 옮겨진 자리를 새 기준점으로
-    if (guideWin && guideWin.isVisible()) positionGuide();
-  };
-  screen.on('display-metrics-changed', onDisplayChange);
-  screen.on('display-added', onDisplayChange);
-  screen.on('display-removed', onDisplayChange);
-
-  // 맥이 몇 시간 자고 일어나면 예약은 이미 지나 있고 창은 엉뚱한 곳에 있을 수 있다
-  powerMonitor.on('resume', () => {
+  app.whenReady().then(() => {
+    applyAppBranding();
+    if (process.platform === 'darwin' && app.dock) app.dock.hide(); // 독 아이콘 숨김
+    createWindow();
+    createTray();
+    startServer();
     armSchedule();
     scheduleSleep();
-    clampWindowToScreen(win);
+    scheduleWander();
+    hiddenSweeper = setInterval(sweepHiddenWindows, TIME.HIDDEN_SWEEP_MS);
+
+    // 전역 단축키 — 실패하면 조용히 무시하지 않고 남긴다
+    const registerShortcut = (accel, fn) => {
+      const ok = globalShortcut.register(accel, fn);
+      if (!ok) console.error('[shortcut] 등록 실패:', accel);
+    };
+    registerShortcut('CommandOrControl+Shift+M', () => {
+      if (!win) return;
+      if (win.isVisible()) win.hide();
+      else win.show();
+    });
+    registerShortcut('CommandOrControl+Shift+H', () =>
+      handleEvent('state', { state: 'greet' })
+    );
+
+    const onDisplayChange = () => {
+      stopWander();
+      clampWindowToScreen(win);
+      wanderHomeX = null; // 옮겨진 자리를 새 기준점으로
+      if (guideWin && guideWin.isVisible()) positionGuide();
+    };
+    screen.on('display-metrics-changed', onDisplayChange);
+    screen.on('display-added', onDisplayChange);
+    screen.on('display-removed', onDisplayChange);
+
+    // 맥이 몇 시간 자고 일어나면 예약은 이미 지나 있고 창은 엉뚱한 곳에 있을 수 있다
+    powerMonitor.on('resume', () => {
+      armSchedule();
+      scheduleSleep();
+      clampWindowToScreen(win);
+    });
+
+    watchConference();
+
+    // 첫 인사
+    setTimeout(() => handleEvent('state', { state: 'greet' }), TIME.FIRST_GREET_MS);
+
+    // 처음 깔았을 때는 무엇을 할 수 있는 앱인지 알려준다.
+    // "다시 보지 않기" 를 켜고 닫았다면 트레이 메뉴로만 열린다.
+    if (!readUiState().hideHelp) {
+      setTimeout(showHelp, TIME.HELP_FIRST_SHOW_MS);
+    }
   });
-
-  watchConference();
-
-  // 첫 인사
-  setTimeout(() => handleEvent('state', { state: 'greet' }), TIME.FIRST_GREET_MS);
-
-  // 처음 깔았을 때는 무엇을 할 수 있는 앱인지 알려준다.
-  // "다시 보지 않기" 를 켜고 닫았다면 트레이 메뉴로만 열린다.
-  if (!readUiState().hideHelp) {
-    setTimeout(showHelp, TIME.HELP_FIRST_SHOW_MS);
-  }
-});
+}
 
 app.on('window-all-closed', () => {
   // 트레이 상주 앱 — 창 닫혀도 종료하지 않음

@@ -26,7 +26,10 @@ const m = require('./mascot-client');
 
 const MASCOT_HOST = process.env.MASCOT_HOST || '127.0.0.1';
 const MASCOT_PORT = Number(process.env.MASCOT_PORT) || 7842;
-const SCRIPT_URL = `http://${MASCOT_HOST}:${MASCOT_PORT}/vitals-client.js`;
+const MASCOT_TOKEN = process.env.MASCOT_TOKEN || '';
+const SCRIPT_URL =
+  `http://${MASCOT_HOST}:${MASCOT_PORT}/vitals-client.js` +
+  (MASCOT_TOKEN ? `?token=${encodeURIComponent(MASCOT_TOKEN)}` : '');
 
 const SIDECAR_PORT = 7843; // 자리를 못 잡을 때 프록시가 설 자리
 const WAIT_TIMEOUT_MS = 60000; // dev 서버가 뜨기를 기다리는 한계
@@ -236,7 +239,11 @@ function waitUpstream() {
   if (waiters.length >= MAX_WAITERS) return Promise.resolve(0);
   return new Promise((resolve) => {
     waiters.push(resolve);
-    setTimeout(() => resolve(devPort), WAIT_TIMEOUT_MS);
+    setTimeout(() => {
+      const i = waiters.indexOf(resolve);
+      if (i >= 0) waiters.splice(i, 1);
+      resolve(devPort);
+    }, WAIT_TIMEOUT_MS);
   });
 }
 
@@ -383,14 +390,17 @@ async function startSidecar() {
 const label = opts.label || opts.cmd.join(' ');
 let child = null;
 
-// "http://localhost:5173" 같은 첫 주소에서 포트를 얻는다
-const URL_RE = /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::(\d+))?/i;
+// "http://localhost:5173" / IPv6 같은 첫 주소에서 포트를 얻는다
+const URL_RE =
+  /https?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1?\]|\[::ffff:127\.0\.0\.1\])(?::(\d+))?/i;
 
 function startChild() {
   child = spawn(opts.cmd[0], opts.cmd.slice(1), {
     // 출력에서 주소를 읽어내야 해서 넘겨받아 그대로 다시 내보낸다.
     // TTY 가 아니게 되므로 색이 꺼지지 않도록 알려둔다.
     stdio: ['inherit', 'pipe', 'pipe'],
+    // Windows 에서 npm/yarn 은 .cmd 라 shell 이 필요하다
+    shell: process.platform === 'win32',
     env: {
       ...process.env,
       FORCE_COLOR: process.env.FORCE_COLOR || '1',
@@ -399,6 +409,9 @@ function startChild() {
       ...(takeover ? { PORT: String(intendedPort + 1) } : null),
     },
   });
+
+  // URL 로그를 안 찍는 서버도 있으니, takeover 면 옆 포트를 미리 기다려 본다
+  if (takeover) setDevPort(intendedPort + 1);
 
   const relay = (from, to) => {
     from.on('data', (buf) => {

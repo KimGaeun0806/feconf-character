@@ -70,12 +70,20 @@ function isDevCommand(cmd) {
   if (mode === 'watch') return false;
 
   const joined = cmd.join(' ');
-  // 스크립트 이름 자체가 dev/start/serve/preview 이면 성능 측정
+  // 스크립트 이름이 정확히 dev/start/serve/preview 이거나, :dev 같은 접미만 허용
+  // (start:prod / start:production 은 빌드 감시로 보낸다)
   const runName = joined.match(/^(npm|yarn|pnpm|bun)(?:\s+run)?\s+(\S+)/);
-  if (runName && /^(dev|start|serve|preview)(:|$)/i.test(runName[2])) return true;
+  if (runName) {
+    const name = runName[2];
+    if (/^(dev|serve|preview)(:|$)/i.test(name)) return true;
+    if (/^start$/i.test(name)) return true;
+    if (/^start:dev$/i.test(name)) return true;
+  }
 
   const text = expandScript(cmd);
-  if (/(?:^|[\s:])(dev|start|serve|preview)(?:\s|$)/i.test(text)) return true;
+  if (/\bstart:(prod|production|release)\b/i.test(text)) return false;
+  if (/(?:^|[\s:])(dev|serve|preview)(?:\s|$)/i.test(text)) return true;
+  if (/(?:^|[\s])start(?:\s|$)/i.test(text)) return true;
   if (
     /^\s*(npx\s+)?(vite|next|nuxt|astro|remix|webpack(\s+serve)?|react-scripts\s+start)\b/i.test(text) &&
     !/\bbuild\b/i.test(text)

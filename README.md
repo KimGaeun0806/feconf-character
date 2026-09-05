@@ -15,7 +15,7 @@
 - 빌드/테스트 메이트 — `feconf-2026` / `mascot-watch` 로 아무 명령이나 감싸기
 - Web Vitals 피드백 — `feconf-2026 npm run dev` 또는 Vite 플러그인으로 LCP·INP·CLS 반응
 - 투명 · 항상 위 · 드래그 · 트레이 상주 · 빈 영역 클릭 통과
-- 클릭 → 인사 + D-day · 트레이 → 컨퍼런스 안내 · 사용 안내 · 방해 금지
+- 클릭 → 인사 · 두 번 클릭 → D-day · 트레이 → 컨퍼런스 안내 · 사용 안내 · 방해 금지
 - 웹훅 `http://127.0.0.1:7842` — 알림 · 상태 · 활동 · vitals
 - 세션 스케줄 자동 알림 — [shared/conference.js](shared/conference.js)
 - 유휴 시 잠자기 · 전역 단축키 `⌘⇧M` / `⌘⇧H` (Windows·Linux는 `Ctrl+Shift+…`)
@@ -66,7 +66,8 @@ npx feconf-2026 npm run dev     # dev 서버 → Web Vitals 피드백
 
 동작 규칙:
 
-- 스크립트 이름이 `dev` / `start` / `serve` / `preview` 계열이면 **성능 측정**
+- 스크립트 이름이 `dev` / `start` / `serve` / `preview`(또는 `start:dev`)이면 **성능 측정**
+- `start:prod` 처럼 프로덕션 계열은 **빌드 감시**
 - 그 외(`build`, `test`, `lint` …)는 **빌드 감시**
 - 강제: `npx feconf-2026 --watch <명령>` · `npx feconf-2026 --dev <명령>`
 
@@ -122,9 +123,9 @@ import mascot from 'feconf-26-mascot/integrations/vite-plugin-mascot.js';
 
 | 변수 | 기본값 | 설명 |
 | --- | --- | --- |
-| `MASCOT_PORT` | `7842` | 앱 웹훅 포트 |
+| `MASCOT_PORT` | `7842` | 앱 웹훅 포트 (Electron도 이 값을 본다) |
 | `MASCOT_HOST` | `127.0.0.1` | 앱 호스트 |
-| `MASCOT_TOKEN` | (없음) | 앱에 `token` 설정 시 함께 지정 |
+| `MASCOT_TOKEN` | (없음) | 앱에 `token` 설정 시 함께 지정 (`?token=` / `x-token`) |
 | `MASCOT_DISABLE` | (없음) | `1`이면 전송 끔 (CI 등) |
 
 ---
@@ -248,7 +249,8 @@ node scripts/send.js state sleeping
 - 규칙: `snail-wide-<emotion>[-long].json`
 - 포맷·웹훅·구조: [CUSTOMIZING.md](CUSTOMIZING.md)
 
-선택: 프로젝트 루트에 `config.json`을 두면 기본값을 덮어씁니다.
+선택: **실행 cwd** 또는 패키지 폴더의 `config.json`을 두면 기본값을 덮어씁니다  
+(`MASCOT_PORT` / `MASCOT_TOKEN` 환경변수가 더 우선합니다).
 
 ```json
 {
@@ -261,13 +263,17 @@ node scripts/send.js state sleeping
 }
 ```
 
+`token`을 켜면 웹훅·vitals에 `x-token` 또는 `?token=`이 필요합니다.  
+`mascot-dev`는 `MASCOT_TOKEN`을 스크립트 URL에 붙여 브라우저 `sendBeacon`도 통과합니다.
+
 ---
 
 ## 요구 사항 · 참고
 
 - Node.js **≥ 18**
 - macOS에서 주로 검증 (Electron)
-- 웹훅 기본 포트 **7842**
+- 웹훅 기본 포트 **7842** (`MASCOT_PORT` / `config.json`으로 변경 가능)
+- `npm i -D` 시 Electron 런타임이 함께 받아집니다 (용량·CI 주의)
 - CI에서는 `MASCOT_DISABLE=1` 권장
 
 ---

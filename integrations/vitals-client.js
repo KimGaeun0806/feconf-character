@@ -20,12 +20,17 @@
 
   // 스크립트를 어디서 받아왔는지가 보낼 곳을 정한다. dev 서버가 내려줬다면 그 서버가
   // 중계하므로 상대 경로로, 마스코트 앱에서 바로 받아왔다면 그 앱으로 곧장 보낸다.
+  // sendBeacon 은 커스텀 헤더를 못 넣으니 token 은 스크립트 URL 의 ?token= 을 그대로 붙인다.
   var ENDPOINT = '/__mascot/vitals';
   try {
     var src = document.currentScript && document.currentScript.src;
     if (src) {
-      var origin = new URL(src, location.href).origin;
-      if (origin !== location.origin) ENDPOINT = origin + '/vitals';
+      var scriptUrl = new URL(src, location.href);
+      if (scriptUrl.origin !== location.origin) {
+        ENDPOINT = scriptUrl.origin + '/vitals';
+        var tok = scriptUrl.searchParams.get('token');
+        if (tok) ENDPOINT += '?token=' + encodeURIComponent(tok);
+      }
     }
   } catch (_) {}
   window.__mascotVitals.endpoint = ENDPOINT;
@@ -69,9 +74,13 @@
 
   function flush(force) {
     if (!dirty) return;
-    // LCP 는 페이지가 다 뜨기 전까지 얼마든지 뒤집힌다. 로드가 끝나기 전에 보내면
-    // 아직 그리는 중인 페이지가 '완벽'으로 판정된다 — 끝난 뒤에 보낸다.
-    if (!force && (!('LCP' in metrics) || document.readyState !== 'complete')) {
+    // LCP 없이 보내면 아직 그리는 중인 페이지가 '완벽'으로 판정된다.
+    // 탭을 닫을 때(force)도 LCP 가 없으면 보내지 않는다.
+    if (!('LCP' in metrics)) {
+      if (!force) return schedule();
+      return;
+    }
+    if (!force && document.readyState !== 'complete') {
       return schedule();
     }
     dirty = false;

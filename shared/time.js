@@ -79,10 +79,21 @@
   const GUIDE_RENDER_MS = 15 * SEC; // 안내 패널 다시 그리기(세션 뱃지·카운트다운)
 
   // ---- 날짜 헬퍼 ----
-  // 자정으로 잘라서 비교한다 — 시:분 때문에 D-day 가 하루씩 틀리지 않게.
-  // 날짜를 주지 않으면 오늘. 날짜 꼴이 아니면 NaN 이라 부르는 쪽에서 걸러낼 수 있다.
+  // 날짜만 비교한다. `YYYY-MM-DD` 는 로컬 자정으로 해석한다
+  // (UTC `Date` 파싱은 타임존에 따라 하루가 밀린다).
   function startOfDay(value) {
-    const d = value ? new Date(value) : new Date();
+    if (value == null || value === '') {
+      const now = new Date();
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    }
+    if (typeof value === 'string') {
+      const m = value.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (m) {
+        return new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime();
+      }
+    }
+    const d = new Date(value);
+    if (isNaN(d.getTime())) return NaN;
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   }
   // 날짜만 세는 차이 — daysUntil(오늘, 행사일) 이 그대로 D-day 숫자가 된다.

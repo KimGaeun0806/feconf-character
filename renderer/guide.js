@@ -40,7 +40,9 @@ function iconEl(name, cls) {
 }
 
 function fmtDate(ds) {
-  const d = new Date(ds);
+  const t = startOfDay(ds);
+  if (isNaN(t)) return '';
+  const d = new Date(t);
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} (${WD[d.getDay()]})`;
 }
 function dateRange(conf) {
@@ -74,10 +76,17 @@ function openLink(url) {
   if (url && window.mascot && window.mascot.openExternal) window.mascot.openExternal(url);
 }
 
+// 템플릿 placeholder 링크는 패널에 안 보여 준다
+function isRealUrl(url) {
+  if (!url || typeof url !== 'string') return false;
+  if (!/^https?:\/\//i.test(url)) return false;
+  return !/your-invite|your-review|example\.com|placeholder/i.test(url);
+}
+
 // 디스코드 카드 (전/후 공통)
 function discordCard(conf) {
   const d = conf.discord;
-  if (!d || !d.url) return null;
+  if (!d || !isRealUrl(d.url)) return null;
   const card = el('button', 'link-card discord');
   card.appendChild(iconEl('discord', 'lc-icon'));
   const body = el('div', 'lc-body');
@@ -175,7 +184,7 @@ function renderAfter(conf) {
   thanks.appendChild(el('div', 'thanks-sub', '오늘 하루 어떠셨나요? 짧은 후기를 남겨주세요.'));
   contentEl.appendChild(thanks);
 
-  if (conf.reviewUrl) {
+  if (isRealUrl(conf.reviewUrl)) {
     const btn = el('button', 'cta');
     btn.appendChild(iconEl('pencil', 'cta-icon'));
     btn.appendChild(document.createTextNode('후기 남기기'));
