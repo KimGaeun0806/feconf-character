@@ -9,7 +9,7 @@
 //   feconf-2026 --watch <명령> → 강제로 빌드 감시
 //   feconf-2026 --dev <명령>   → 강제로 성능 측정
 //
-// 앱 실행은: npx feconf-2026-mascot
+// 앱 실행은: npx feconf-26-mascot
 // ===========================================================================
 
 const fs = require('fs');
@@ -26,7 +26,7 @@ if (!args.length || args[0] === '-h' || args[0] === '--help') {
   ${me} --watch <명령>    강제로 빌드 감시
   ${me} --dev <명령>      강제로 성능 측정
 
-앱 실행은: npx feconf-2026-mascot`);
+앱 실행은: npx feconf-26-mascot`);
   process.exit(args.length ? 0 : 1);
 }
 

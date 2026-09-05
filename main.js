@@ -15,8 +15,17 @@ const {
 } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const http = require('http');
 const TIME = require('./shared/time'); // 기다리는 시간·날짜 계산은 렌더러와 같은 값을 쓴다
+const {
+  ROOT,
+  loadConfig,
+  appIcon,
+  applyAppBranding,
+  TRAY_ICON_PATH,
+} = require('./lib/config');
+const { loadAnims } = require('./lib/anims');
+const { createVitalsHandler } = require('./lib/vitals');
+const { startWebhookServer } = require('./lib/webhook-server');
 
 // 트레이에 며칠씩 상주하는 앱이라 예외 하나로 통째로 죽으면 사용자는 이유도 모르고
 // 마스코트를 잃는다. 기록만 남기고 버틴다 — Node 는 처리되지 않은 rejection 도
@@ -28,56 +37,6 @@ process.on('unhandledRejection', (reason) => {
   console.error('[fatal] 처리되지 않은 rejection:', (reason && reason.stack) || reason);
 });
 
-// ---------------------------------------------------------------------------
-// 설정 (config.json 으로 덮어쓸 수 있음)
-// ---------------------------------------------------------------------------
-const DEFAULT_CONFIG = {
-  port: 7842,          // 웹훅 HTTP 서버 포트
-  token: '',           // 설정 시 웹훅 요청에 x-token 헤더 필요 (빈 값이면 인증 없음)
-  width: 315, // 달팽이 좌하단 + 말풍선/D-day 팝업 우상단 구성
-  height: 260,
-  margin: 24,          // 화면 모서리로부터 여백
-  corner: 'bottom-right', // bottom-right | bottom-left | top-right | top-left
-  idleSleepMs: 90 * TIME.SEC, // 이 시간 동안 이벤트 없으면 잠자기
-  guideTitle: '컨퍼런스 안내',
-  guideSubtitle: '오늘의 세션',
-  guideWidth: 320,
-  guideHeight: 500, // before/after 화면이 스크롤 없이 들어가는 높이
-};
-
-// ---------------------------------------------------------------------------
-// 앱 로고 / 아이콘
-// ---------------------------------------------------------------------------
-const APP_NAME = 'FEConf Mascot';
-const APP_ICON_PATH = path.join(__dirname, 'assets', 'icon.png');
-// 파일명이 Template 로 끝나면 macOS 가 메뉴바 밝기에 맞춰 자동 반전한다.
-const TRAY_ICON_PATH = path.join(__dirname, 'assets', 'trayTemplate.png');
-
-function appIcon() {
-  const img = nativeImage.createFromPath(APP_ICON_PATH);
-  return img.isEmpty() ? undefined : img;
-}
-
-function applyAppBranding() {
-  app.setName(APP_NAME);
-  if (process.platform !== 'darwin' || !app.dock) return;
-  const icon = appIcon();
-  if (icon) app.dock.setIcon(icon);
-}
-
-function loadConfig() {
-  const cfgPath = path.join(__dirname, 'config.json');
-  let cfg = { ...DEFAULT_CONFIG };
-  try {
-    if (fs.existsSync(cfgPath)) {
-      Object.assign(cfg, JSON.parse(fs.readFileSync(cfgPath, 'utf8')));
-    }
-  } catch (e) {
-    console.error('[config] 읽기 실패, 기본값 사용:', e.message);
-  }
-  return cfg;
-}
-
 const CONFIG = loadConfig();
 
 let win = null;
@@ -87,9 +46,6 @@ let server = null;
 let dnd = false;           // Do Not Disturb
 let sleepTimer = null;
 let asleep = false;        // 자는 중이면 산책하지 않는다
-let overridePhase = null;  // 개발용 phase 강제 (before|dayof|after|null)
-let mockNow = null;        // 개발용 모의 시각(ms), null = 실시간
-let devWin = null;
 let helpWin = null;
 const scheduledTimers = [];
 const activeNotifications = new Set();
@@ -150,7 +106,7 @@ function clampWindowToScreen(w) {
   if (p.x !== x || p.y !== y) safeSetPosition(w, p.x, p.y);
 }
 
-// 마스코트·안내 패널·개발자 창이 모두 같은 브리지를 쓴다
+// 마스코트·안내·사용 안내 창이 모두 같은 브리지를 쓴다
 const WEB_PREFS = {
   preload: path.join(__dirname, 'preload.js'),
   contextIsolation: true,
@@ -191,8 +147,8 @@ function createWindow() {
 
 // ---------------------------------------------------------------------------
 // 숨긴 창 정리
-// 창을 숨겨도 렌더러 프로세스는 통째로 남아 60MB 남짓을 계속 붙잡는다. 안내 패널과
-// 개발자 창은 어쩌다 한 번 여는 것이라, 한동안 닫혀 있으면 버리고 다음에 다시 만든다.
+// 창을 숨겨도 렌더러 프로세스는 통째로 남아 60MB 남짓을 계속 붙잡는다. 안내·사용
+// 안내 창은 어쩌다 한 번 여는 것이라, 한동안 닫혀 있으면 버리고 다음에 다시 만든다.
 // ---------------------------------------------------------------------------
 // show/hide 이벤트는 showInactive()·hide() 로 여닫을 때 오지 않아 믿을 수 없다.
 // 값이 정확한 isVisible() 을 주기적으로 들여다본다.
@@ -200,7 +156,7 @@ const hiddenSince = new Map();
 let hiddenSweeper = null;
 
 function sweepHiddenWindows() {
-  for (const w of [guideWin, devWin, helpWin]) {
+  for (const w of [guideWin, helpWin]) {
     if (!w || w.isDestroyed()) continue;
     if (w.isVisible()) {
       hiddenSince.delete(w);
@@ -333,15 +289,11 @@ function loadConference() {
   }
 }
 
-function effNow() {
-  return mockNow != null ? mockNow : Date.now();
-}
 // 자정 기준 날짜 비교로 phase 결정
 function conferencePhase(conf) {
-  if (overridePhase) return overridePhase;
   const start = TIME.startOfDay(conf.startDate);
   const end = TIME.startOfDay(conf.endDate || conf.startDate);
-  const today = TIME.startOfDay(effNow());
+  const today = TIME.startOfDay(Date.now());
   if (isNaN(start)) return 'dayof';
   if (today < start) return 'before';
   if (today > end) return 'after';
@@ -356,7 +308,7 @@ function guideData() {
     phase: conferencePhase(conf),
     title: CONFIG.guideTitle || '컨퍼런스 안내',
     subtitle: CONFIG.guideSubtitle,
-    now: effNow(),
+    now: Date.now(),
   };
 }
 
@@ -386,48 +338,6 @@ function showGuide() {
   positionGuide();
   pushGuideData();
   if (!guideWin.isVisible()) guideWin.showInactive();
-}
-
-// ---------------------------------------------------------------------------
-// 개발자 미리보기 창 (phase/시간 스크럽)
-// ---------------------------------------------------------------------------
-// 개발자 창은 phase·시각을 가짜로 바꿔둔다 — 창을 접으면 실시간으로 되돌린다
-function resetDevOverrides() {
-  overridePhase = null;
-  mockNow = null;
-  pushGuideData();
-}
-
-function createDevWindow() {
-  devWin = new BrowserWindow({
-    width: 340,
-    height: 800,
-    show: false,
-    frame: false,
-    transparent: true,
-    resizable: false,
-    hasShadow: false,
-    alwaysOnTop: true,
-    skipTaskbar: true,
-    icon: appIcon(),
-    webPreferences: WEB_PREFS,
-  });
-  devWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
-  devWin.loadFile(path.join(__dirname, 'renderer', 'dev.html'));
-  const w = devWin;
-
-  w.on('close', (e) => {
-    if (!app.isQuitting) {
-      e.preventDefault();
-      w.hide();
-      resetDevOverrides();
-    }
-  });
-
-  w.on('closed', () => {
-    hiddenSince.delete(w);
-    if (devWin === w) devWin = null;
-  });
 }
 
 // ---------------------------------------------------------------------------
@@ -529,19 +439,6 @@ function toggleHelp() {
     return;
   }
   showHelp();
-}
-
-function toggleDev() {
-  if (!devWin) createDevWindow();
-  if (devWin.isVisible()) {
-    devWin.hide();
-    resetDevOverrides();
-  } else {
-    const wa = screen.getPrimaryDisplay().workArea;
-    safeSetPosition(devWin, wa.x + 40, wa.y + 60);
-    devWin.show(); // 입력 위해 포커스 허용
-    showGuide();
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -791,197 +688,24 @@ function handleEvent(kind, data = {}) {
 }
 
 // ---------------------------------------------------------------------------
-// Web Vitals 피드백 — dev 서버에서 띄운 페이지의 실측 지표에 마스코트가 반응한다
+// Web Vitals + HTTP 웹훅 서버 (로직은 lib/ 로 분리)
 // ---------------------------------------------------------------------------
-// 임계값은 web.dev 의 Core Web Vitals 기준. good 이하 / poor 초과 사이가 '개선 필요'.
-const VITALS = {
-  LCP: { good: 2500, poor: 4000 },
-  INP: { good: 200, poor: 500 },
-  CLS: { good: 0.1, poor: 0.25 },
-  FCP: { good: 1800, poor: 3000 },
-  TTFB: { good: 800, poor: 1800 },
-};
-const VITAL_ORDER = ['LCP', 'INP', 'CLS', 'FCP', 'TTFB'];
-const GRADE_RANK = { good: 0, ni: 1, poor: 2 };
+const handleVitals = createVitalsHandler({
+  TIME,
+  getDnd: () => dnd,
+  scheduleSleep,
+  sendToMascot,
+});
 
-// 같은 평가가 반복될 땐 조용히, 평가가 바뀌었을 땐 빠르게 알려준다(VITALS_GAP_*).
-// 저장할 때마다 페이지가 새로고침되는 dev 환경에선 이 간격이 없으면 말풍선만 뜬다.
-let lastVitalsGrade = null;
-let lastVitalsAt = 0;
-
-function formatVital(name, value) {
-  if (name === 'CLS') return value.toFixed(3);
-  return value >= 1000 ? `${(value / 1000).toFixed(1)}s` : `${Math.round(value)}ms`;
-}
-
-function gradeVitals(metrics = {}) {
-  const graded = [];
-  for (const name of VITAL_ORDER) {
-    // 브라우저가 보내는 키 대소문자를 가리지 않는다
-    const raw = metrics[name] != null ? metrics[name] : metrics[name.toLowerCase()];
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value < 0) continue;
-    const t = VITALS[name];
-    graded.push({
-      name,
-      value,
-      grade: value <= t.good ? 'good' : value > t.poor ? 'poor' : 'ni',
-    });
-  }
-  return graded;
-}
-
-function handleVitals(payload = {}) {
-  const metrics = payload.metrics && typeof payload.metrics === 'object' ? payload.metrics : payload;
-  const graded = gradeVitals(metrics);
-  if (!graded.length) return { ok: false, error: 'no known metrics' };
-
-  const worst = graded.reduce((a, b) => (GRADE_RANK[b.grade] > GRADE_RANK[a.grade] ? b : a));
-  const overall = worst.grade;
-  const summary = graded.map((g) => `${g.name} ${formatVital(g.name, g.value)}`).join(' · ');
-  console.log(`[vitals] ${overall} — ${summary}${payload.url ? ` (${payload.url})` : ''}`);
-
-  if (dnd) return { ok: true, grade: overall, summary, skipped: 'dnd' };
-
-  // 평가가 그대로면 한동안 다시 말 걸지 않는다. 다만 나빠진 소식은 늦게 알면 쓸모가
-  // 없다 — LCP 처럼 뒤늦게 확정되는 지표가 판정을 뒤집었을 때 막히지 않게 짧게 끊는다.
-  const changed = overall !== lastVitalsGrade;
-  const worse = !lastVitalsGrade || GRADE_RANK[overall] > GRADE_RANK[lastVitalsGrade];
-  const minGap = worse
-    ? TIME.VITALS_GAP_WORSE_MS
-    : changed
-      ? TIME.VITALS_GAP_CHANGED_MS
-      : TIME.VITALS_GAP_SAME_MS;
-  if (Date.now() - lastVitalsAt < minGap) {
-    return { ok: true, grade: overall, summary, skipped: 'throttled' };
-  }
-  lastVitalsGrade = overall;
-  lastVitalsAt = Date.now();
-
-  // 루트 경로는 알려줘봤자 정보가 없다 — 여러 페이지를 오갈 때만 어디였는지 밝힌다
-  const where = payload.url && payload.url !== '/' ? String(payload.url).slice(0, 40) : '';
-  let title;
-  let message;
-  let level;
-  let reaction;
-  if (overall === 'good') {
-    title = '💯 Web Vitals 완벽!';
-    message = summary;
-    level = 'success';
-    reaction = 'love';
-  } else {
-    const others = graded.filter((g) => g.grade !== 'good' && g !== worst).length;
-    const limit = formatVital(worst.name, VITALS[worst.name].good);
-    title = overall === 'poor' ? '🐌 많이 느려졌어요' : '🤔 조금 아쉬워요';
-    message =
-      `${worst.name} ${formatVital(worst.name, worst.value)} · 기준 ${limit} 이하` +
-      (others ? ` 외 ${others}개` : '') +
-      (where ? ` · ${where}` : '');
-    level = overall === 'poor' ? 'warn' : 'info';
-    reaction = 'curious';
-  }
-
-  // 저장할 때마다 시스템 알림이 쌓이면 성가시다 — 말풍선으로만 알려준다
-  scheduleSleep();
-  sendToMascot('mascot:notify', { title, message, level, reaction });
-  return { ok: true, grade: overall, summary };
-}
-
-// ---------------------------------------------------------------------------
-// HTTP 웹훅 서버
-// ---------------------------------------------------------------------------
 function startServer() {
-  server = http.createServer((req, res) => {
-    // CORS (로컬 웹훅/브라우저에서 편하게 호출)
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-token');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    if (req.method === 'OPTIONS') {
-      res.writeHead(204);
-      return res.end();
-    }
-
-    const url = new URL(req.url, `http://localhost:${CONFIG.port}`);
-
-    // 측정 스크립트를 앱이 직접 내려준다 — dev 서버가 Vite 가 아니어도(Next·webpack 등)
-    // 이 주소만 페이지에 걸면 되도록. 응답 헤더의 CORS 는 위에서 이미 열어둔다.
-    if (req.method === 'GET' && url.pathname === '/vitals-client.js') {
-      fs.readFile(VITALS_CLIENT_PATH, (err, buf) => {
-        if (err) {
-          res.writeHead(404);
-          return res.end();
-        }
-        res.writeHead(200, {
-          'Content-Type': 'application/javascript; charset=utf-8',
-          'Cache-Control': 'no-store',
-        });
-        res.end(buf);
-      });
-      return;
-    }
-
-    if (req.method === 'GET' && url.pathname === '/health') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify({ ok: true, dnd, version: app.getVersion() }));
-    }
-
-    // 토큰 인증 (설정된 경우)
-    if (CONFIG.token) {
-      const tok = req.headers['x-token'] || url.searchParams.get('token');
-      if (tok !== CONFIG.token) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ ok: false, error: 'unauthorized' }));
-      }
-    }
-
-    if (req.method !== 'POST') {
-      res.writeHead(404);
-      return res.end();
-    }
-
-    let body = '';
-    req.on('data', (c) => {
-      body += c;
-      if (body.length > 1e6) req.destroy(); // 1MB 초과 차단
-    });
-    req.on('end', () => {
-      let data = {};
-      try {
-        data = body ? JSON.parse(body) : {};
-      } catch (_) {
-        // form/query 로도 받아줌
-        for (const [k, v] of url.searchParams) data[k] = v;
-      }
-
-      if (url.pathname === '/notify') {
-        if (dnd) {
-          res.writeHead(200, { 'Content-Type': 'application/json' });
-          return res.end(JSON.stringify({ ok: true, suppressed: 'dnd' }));
-        }
-        handleEvent('notify', data);
-      } else if (url.pathname === '/activity') {
-        handleEvent('activity', data);
-      } else if (url.pathname === '/state') {
-        handleEvent('state', data);
-      } else if (url.pathname === '/vitals') {
-        const result = handleVitals(data);
-        res.writeHead(result.ok ? 200 : 400, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify(result));
-      } else {
-        res.writeHead(404, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ ok: false, error: 'unknown endpoint' }));
-      }
-
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true }));
-    });
-  });
-
-  server.on('error', (e) => {
-    console.error('[server] 오류:', e.message);
-  });
-  server.listen(CONFIG.port, '127.0.0.1', () => {
-    console.log(`[server] http://127.0.0.1:${CONFIG.port} 대기중`);
+  server = startWebhookServer({
+    port: CONFIG.port,
+    token: CONFIG.token,
+    getDnd: () => dnd,
+    getVersion: () => app.getVersion(),
+    handleEvent,
+    handleVitals,
+    vitalsClientPath: VITALS_CLIENT_PATH,
   });
 }
 
@@ -1134,27 +858,7 @@ function createTray() {
 // ---------------------------------------------------------------------------
 // IPC (렌더러 → 메인)
 // ---------------------------------------------------------------------------
-// 캐릭터 애니메이션 (charactor/*.json — 마름모 아트보드 포맷)
-ipcMain.handle('mascot:getAnims', () => {
-  // 짧은 버전·미리보기 SVG 는 쓰지 않는다 — 롱 애니와 말풍선만 읽어 시작을 가볍게
-  const dir = path.join(__dirname, 'charactor');
-  const out = {};
-  try {
-    for (const f of fs.readdirSync(dir)) {
-      if (!f.endsWith('.json')) continue;
-      const base = path.basename(f, '.json').normalize('NFC');
-      if (!base.includes('롱') && !base.startsWith('말풍선')) continue;
-      try {
-        out[base] = JSON.parse(fs.readFileSync(path.join(dir, f), 'utf8'));
-      } catch (e) {
-        console.error('[anims] 파싱 실패:', f, e.message);
-      }
-    }
-  } catch (e) {
-    console.error('[anims] 읽기 실패:', e.message);
-  }
-  return out;
-});
+ipcMain.handle('mascot:getAnims', () => loadAnims(path.join(ROOT, 'character')));
 ipcMain.on('mascot:setIgnoreMouse', (_e, ignore) => {
   if (win && !win.isDestroyed()) {
     win.setIgnoreMouseEvents(!!ignore, { forward: true });
@@ -1213,9 +917,6 @@ ipcMain.on('mascot:click', () => {
   // 인사 + D-day 팝업은 렌더러가 창 안 오버레이로 처리 (안내 패널은 트레이에서)
   scheduleSleep();
 });
-ipcMain.on('mascot:rightclick', () => {
-  toggleDev();
-});
 
 ipcMain.handle('guide:getData', () => guideData());
 ipcMain.on('guide:close', () => {
@@ -1258,34 +959,6 @@ ipcMain.on('help:close', (_e, { dontShowAgain } = {}) => {
 
 ipcMain.on('open:external', (_e, url) => {
   if (typeof url === 'string' && /^https?:\/\//.test(url)) shell.openExternal(url);
-});
-
-// 개발자 미리보기
-ipcMain.handle('dev:getInit', () => ({
-  conference: loadConference(),
-  items: loadSchedule(),
-}));
-ipcMain.handle('dev:apply', (_e, opts = {}) => {
-  overridePhase = opts.phase || null;
-  mockNow = opts.mockNow != null ? opts.mockNow : null;
-  showGuide();
-  return { now: effNow(), phase: conferencePhase(loadConference()) };
-});
-// 달팽이 상태/감정 전환 (dev 패널)
-ipcMain.on('dev:state', (_e, opts = {}) => {
-  handleEvent('state', { state: opts.state, ttl: opts.ttl });
-});
-// 말풍선 스타일 전환 (dev 패널)
-ipcMain.on('dev:bubble', (_e, opts = {}) => {
-  sendToMascot('mascot:bubble', { style: opts.style });
-});
-// 말풍선 폰트 전환 (dev 패널)
-ipcMain.on('dev:font', (_e, opts = {}) => {
-  sendToMascot('mascot:font', { font: opts.font });
-});
-ipcMain.on('dev:hide', () => {
-  if (devWin && devWin.isVisible()) devWin.hide();
-  resetDevOverrides();
 });
 
 // ---------------------------------------------------------------------------

@@ -1,7 +1,7 @@
 'use strict';
 
 // ===========================================================================
-// 시간·날짜 공용 값 — 메인 프로세스와 렌더러 세 창이 모두 같은 값을 본다.
+// 시간·날짜 공용 값 — 메인 프로세스와 렌더러 창이 모두 같은 값을 본다.
 //
 // 렌더러는 contextIsolation 때문에 require 를 쓸 수 없다. 그래서 어떻게 읽히든
 // 같은 객체를 내주도록 두 방식을 모두 지원한다.
@@ -77,7 +77,6 @@
   // ---- 패널 갱신 ----
   const GUIDE_CLOCK_MS = 1 * SEC; // 안내 패널 시계
   const GUIDE_RENDER_MS = 15 * SEC; // 안내 패널 다시 그리기(세션 뱃지·카운트다운)
-  const DEV_FLASH_MS = 350; // dev 패널 버튼 깜빡임
 
   // ---- 날짜 헬퍼 ----
   // 자정으로 잘라서 비교한다 — 시:분 때문에 D-day 가 하루씩 틀리지 않게.
@@ -137,7 +136,6 @@
     VITALS_GAP_WORSE_MS,
     GUIDE_CLOCK_MS,
     GUIDE_RENDER_MS,
-    DEV_FLASH_MS,
     startOfDay,
     daysUntil,
     pad,

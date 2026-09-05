@@ -39,10 +39,10 @@ const PAGES = [
     emoji: '🔌',
     title: '프로젝트에 연결하기',
     lead: '빌드·성능 반응을 쓰려면 프로젝트에 한 번 설치해요.',
-    code: 'npm i -D feconf-2026-mascot',
+    code: 'npm i -D feconf-26-mascot',
     codeLabel: '설치',
     rows: [
-      ['앱', 'npx feconf-2026-mascot'],
+      ['앱', 'npx feconf-26-mascot'],
       ['빌드', 'npx feconf-2026 npm run build'],
       ['dev', 'npx feconf-2026 npm run dev'],
     ],

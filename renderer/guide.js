@@ -1,7 +1,6 @@
 'use strict';
 
 // 컨퍼런스 안내 — 행사 전 / 당일 / 이후 3가지 상태
-// 시간은 main 이 넘겨준 data.now 를 기준으로 흐름(simNow) → 개발용 모의 시각 지원
 
 const contentEl = document.getElementById('content');
 const clockEl = document.getElementById('clock');
@@ -10,17 +9,6 @@ const subtitleEl = document.getElementById('subtitle');
 const footerEl = document.getElementById('footer-text');
 
 let data = { items: [], conference: {}, phase: 'dayof' };
-
-// ---- 시뮬레이션 시계 ---------------------------------------------------------
-let baseNow = Date.now();
-let baseMono = performance.now();
-function setBase(d) {
-  baseNow = d && typeof d.now === 'number' ? d.now : Date.now();
-  baseMono = performance.now();
-}
-function simNow() {
-  return baseNow + (performance.now() - baseMono);
-}
 
 const WD = ['일', '월', '화', '수', '목', '금', '토'];
 const { pad, hhmm, startOfDay } = TIME; // shared/time.js
@@ -63,7 +51,7 @@ function dateRange(conf) {
   return `${fmtDate(s)} ~ ${fmtDate(e)}`;
 }
 function ddayCount(conf) {
-  return TIME.daysUntil(simNow(), conf.startDate);
+  return TIME.daysUntil(Date.now(), conf.startDate);
 }
 function fmtEta(ms) {
   const min = Math.round(ms / TIME.MIN);
@@ -142,7 +130,7 @@ function renderDayof(conf) {
   subtitleEl.textContent = data.subtitle || '오늘의 세션';
   footerEl.textContent = '✕ 버튼이나 트레이 메뉴로 닫을 수 있어요';
 
-  const now = simNow();
+  const now = Date.now();
   const items = [...(data.items || [])].sort((a, b) => new Date(a.time) - new Date(b.time));
 
   // 다음 세션 배너
@@ -218,7 +206,7 @@ function render() {
 }
 
 function tickClock() {
-  const d = new Date(simNow());
+  const d = new Date();
   clockEl.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
@@ -226,10 +214,7 @@ async function refresh() {
   if (window.mascot && window.mascot.guideGetData) {
     try {
       const d = await window.mascot.guideGetData();
-      if (d) {
-        data = d;
-        setBase(d);
-      }
+      if (d) data = d;
     } catch (_) {}
   }
   render();
@@ -254,10 +239,7 @@ window.addEventListener('keydown', (e) => {
 
 if (window.mascot && window.mascot.onGuideData) {
   window.mascot.onGuideData((d) => {
-    if (d) {
-      data = d;
-      setBase(d);
-    }
+    if (d) data = d;
     render();
   });
 }

@@ -2,13 +2,13 @@
 
 // ===========================================================================
 // 마스코트 — 파란 마름모 달팽이
-// 아트/애니메이션: charactor/*.json (마름모 아트보드 포맷, 유저 제작)
+// 아트/애니메이션: character/*.json (마름모 아트보드 포맷, 유저 제작)
 //   페이지 1장 = 프레임 1장. 셀 1칸 = 기울어진(-20°) 둥근 마름모 블록,
 //   같은 색 연속 구간(가로/세로)은 캡슐로 병합해서 그린다.
 //   이펙트(Zzz/!/하트/물음표)도 아트 프레임 안에 포함되어 있다.
 // 감정 매핑 (파일 네이밍 기반):
-//   잠-숨→sleeping   전진→walking   갸웃→working·curious   인사→greet
-//   신남→happy      놀람→notify    사랑→love   빼꼼→peek   깸→wake
+//   sleep→sleeping   walk→walking   curious→working·curious·idle   greet→greet
+//   happy→happy      surprise→notify    love→love   peek→peek   wake→wake
 // 말풍선/D-day 팝업: SVG 모양 + MonaS12 픽셀 폰트 (joohee 작업 병합)
 // ===========================================================================
 
@@ -31,26 +31,26 @@ const bMsg = document.getElementById('bubble-msg');
 const dndBadge = document.getElementById('dnd-badge');
 
 // ---- 애니메이션 레지스트리 ---------------------------------------------------
-// file: charactor/스네일-와이드-<file>.json, loop: 상태 유지 중 반복 여부
-const FILE_PREFIX = '스네일-와이드-';
+// file: character/snail-wide-<file>.json, loop: 상태 유지 중 반복 여부
+const FILE_PREFIX = 'snail-wide-';
 const ANIM = {
-  idle: { file: '갸웃-롱', fps: 0, loop: true }, // 중립 포즈(1프레임) + 바운스
-  sleeping: { file: '잠-숨-롱', fps: 4, loop: true },
-  walking: { file: '전진-롱', fps: 10, loop: true },
-  working: { file: '갸웃-롱', fps: 6, loop: true },
-  happy: { file: '신남-롱', fps: 9, loop: true },
-  notify: { file: '놀람-롱', fps: 8, loop: true },
-  greet: { file: '인사-롱', fps: 8, loop: false },
-  love: { file: '사랑-롱', fps: 8, loop: false },
-  curious: { file: '갸웃-롱', fps: 8, loop: false },
-  peek: { file: '빼꼼-롱', fps: 7, loop: false },
-  wake: { file: '깸-롱', fps: 8, loop: false },
+  idle: { file: 'curious-long', fps: 0, loop: true }, // 중립 포즈(1프레임) + 바운스
+  sleeping: { file: 'sleep-long', fps: 4, loop: true },
+  walking: { file: 'walk-long', fps: 10, loop: true },
+  working: { file: 'curious-long', fps: 6, loop: true },
+  happy: { file: 'happy-long', fps: 9, loop: true },
+  notify: { file: 'surprise-long', fps: 8, loop: true },
+  greet: { file: 'greet-long', fps: 8, loop: false },
+  love: { file: 'love-long', fps: 8, loop: false },
+  curious: { file: 'curious-long', fps: 8, loop: false },
+  peek: { file: 'peek-long', fps: 7, loop: false },
+  wake: { file: 'wake-long', fps: 8, loop: false },
 };
 
 // ---- 프레임 렌더링 (마름모 캡슐 병합) ------------------------------------------
 const CELLPX = 10; // 오프스크린 셀 픽셀 (백킹 해상도에 맞춤)
 const CHAR_SCALE = 0.5; // 캐릭터 전체 배율 (1 = 창에 꽉 참)
-let animsRaw = null; // { '스네일-와이드-…': { pages } }
+let animsRaw = null; // { 'snail-wide-…': { pages } }
 let VIEW = null; // 그리드 px → 논리 좌표 매핑 { s, ox, oy, cellL, tanA }
 const frameCache = new Map(); // file → HTMLCanvasElement[]
 
@@ -169,7 +169,7 @@ function computeView() {
     maxY = -Infinity,
     tanA = 0.36;
   for (const [key, data] of Object.entries(animsRaw)) {
-    if (!key.startsWith(FILE_PREFIX)) continue; // 스네일 프레임만 (말풍선 JSON 제외)
+    if (!key.startsWith(FILE_PREFIX)) continue; // snail frames only (exclude bubble JSON)
     for (const page of data.pages) {
       const cfg = page.cfg;
       const cell = CELLPX;
@@ -206,7 +206,7 @@ if (window.mascot && window.mascot.getAnims) {
   });
 }
 
-// ---- 말풍선 스타일 — 기존 SVG or JSON 픽셀 말풍선 (charactor/말풍선-*.json) ----
+// ---- 말풍선 스타일 — 기존 SVG or JSON 픽셀 말풍선 (character/bubble-*.json) ----
 // 텍스트가 길면 캡(모서리·꼬리·탭)은 그대로 두고 중앙의 균일한 컬럼을
 // 그리드 규칙대로 복제해 좌우로 넓힌다 (insL/insR = 삽입 지점, 꼬리 양옆).
 // baseW/cellCss 는 기본 표시 폭과 셀 1칸의 CSS px, padL/padR 는 텍스트 여백.
@@ -218,9 +218,9 @@ const BUBBLE_STYLES = {
   // FEConf 스타일 — 몸통을 CSS 박스로 그려서 텍스트만큼 저절로 늘어난다 (style.css)
   navy: { css: true }, // 네이비 알림 (Figma 2:11)
   feconf: { css: true }, // 텍스트 배너 (Figma 2:2)
-  comic: { file: '말풍선-만화', baseW: 208, cellCss: 6.05, insL: 6, insR: 20, padL: 32, padR: 24 },
-  purple: { file: '말풍선-메시지-퍼플', baseW: 196, cellCss: 7.38, insL: 6, insR: 16, padL: 26, padR: 18 },
-  cozy: { file: '말풍선-코지', baseW: 212, cellCss: 5.83, insL: 9, insR: 24, padL: 28, padR: 18 },
+  comic: { file: 'bubble-comic', baseW: 208, cellCss: 6.05, insL: 6, insR: 20, padL: 32, padR: 24 },
+  purple: { file: 'bubble-purple', baseW: 196, cellCss: 7.38, insL: 6, insR: 16, padL: 26, padR: 18 },
+  cozy: { file: 'bubble-cozy', baseW: 212, cellCss: 5.83, insL: 9, insR: 24, padL: 28, padR: 18 },
 };
 let bubbleStyle = 'navy'; // 기본 말풍선 — 클릭/알림 모두 네이비 폼
 const BUBBLE_MAX_W = 245; // 오른쪽으로 옮긴 좌측 기준에서도 창(315px) 안에 들어오는 최대 폭
@@ -492,32 +492,6 @@ if (window.mascot) {
   window.mascot.onDnd(({ dnd }) => {
     dndBadge.classList.toggle('hidden', !dnd);
   });
-  // dev 패널에서 말풍선 스타일 전환 → 적용 + 미리보기 표시
-  if (window.mascot.onBubbleStyle) {
-    window.mascot.onBubbleStyle(({ style }) => {
-      applyBubbleStyle(style);
-      showBubble({
-        title: '⭐️ 야호~빌드 완료~🎵⭐️',
-        message: '말풍선 미리보기 · ' + style,
-        level: 'success',
-      });
-    });
-  }
-  // 개발용 — /debug/dday 로 클릭 팝업 표시 (더블클릭 없이 확인)
-  if (window.mascot.onDday) {
-    window.mascot.onDday(() => toggleClickBubble());
-  }
-  // dev 패널에서 말풍선 폰트 전환 (pixel | pretendard)
-  if (window.mascot.onFont) {
-    window.mascot.onFont(({ font }) => {
-      document.body.classList.toggle('font-pretendard', font === 'pretendard');
-      showBubble({
-        title: '⭐️ 야호~빌드 완료~🎵⭐️',
-        message: '폰트 미리보기 · ' + (font === 'pretendard' ? '프리텐다드' : '픽셀(MonaS12)'),
-        level: 'success',
-      });
-    });
-  }
 }
 
 // ===========================================================================
@@ -625,11 +599,6 @@ cv.addEventListener('mousedown', (e) => {
   if (window.mascot && window.mascot.dragStart) window.mascot.dragStart();
 });
 
-// 오른쪽 클릭 → 개발자 미리보기 패널
-cv.addEventListener('contextmenu', (e) => {
-  e.preventDefault();
-  if (window.mascot) window.mascot.rightClick();
-});
 window.addEventListener('mousemove', (e) => {
   if (!dragging) return;
   const dx = e.screenX - last.x;

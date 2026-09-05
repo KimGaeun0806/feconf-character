@@ -1,9 +1,11 @@
 {
-  "name": "feconf-2026-mascot",
-  "version": "0.1.0",
-  "description": "픽셀아트 데스크탑 달팽이 마스코트 — 빌드/테스트/dev 서버 상태 메이트 (+ 컨퍼런스 안내)",
+  "name": "feconf-26-mascot",
+  "version": "0.1.2",
+  "description": "Desktop pixel-art snail mascot for FE builds, tests, and Web Vitals — plus FECONF conference cues (Electron)",
   "main": "main.js",
   "bin": {
+    "feconf-26-mascot": "scripts/start-branded-dev.js",
+    "feconf-mascot": "scripts/start-branded-dev.js",
     "feconf-2026-mascot": "scripts/start-branded-dev.js",
     "feconf-2026": "integrations/feconf.js",
     "feconf": "integrations/feconf.js",
@@ -13,14 +15,16 @@
   "files": [
     "main.js",
     "preload.js",
+    "lib/",
     "renderer/",
     "shared/",
-    "charactor/",
+    "character/",
     "assets/",
     "integrations/",
     "scripts/",
     "CUSTOMIZING.md",
-    "OVERVIEW.md"
+    "OVERVIEW.md",
+    "README.md"
   ],
   "scripts": {
     "start": "node scripts/start-branded-dev.js",
@@ -28,15 +32,26 @@
     "notify": "node scripts/send.js",
     "watch": "node integrations/mascot-watch.js"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KimGaeun0806/feconf-character.git"
+  },
+  "bugs": {
+    "url": "https://github.com/KimGaeun0806/feconf-character/issues"
+  },
+  "homepage": "https://github.com/KimGaeun0806/feconf-character#readme",
   "keywords": [
+    "feconf",
     "electron",
     "mascot",
-    "pixel-art",
     "desktop-pet",
-    "vite-plugin",
-    "feconf"
+    "pixel-art",
+    "web-vitals",
+    "build-tools",
+    "developer-tools",
+    "vite"
   ],
-  "author": "",
+  "author": "FECONF",
   "license": "MIT",
   "engines": {
     "node": ">=18"
