@@ -7,7 +7,7 @@
   --text: #16181d;
   --text-2: #5b616e;
   --text-3: #6b7280; /* 흰 배경 대비 4.8:1 — 보조 텍스트도 WCAG AA 충족 */
-  /* 달팽이 셸 블루 — 캐릭터(#2e7cf6/#0f5bdd)와 톤 연결 */
+  /* 버디 셸 블루 — 캐릭터(#2e7cf6/#0f5bdd)와 톤 연결 */
   --accent: #0f5bdd; /* 흰 텍스트·흰 배경 양쪽 대비 5.9:1 */
   --accent-bright: #2e7cf6; /* 대형 텍스트(3:1) 전용 */
   --accent-soft: #eef4fe;
@@ -81,7 +81,7 @@ header:active {
   align-items: center;
   gap: 11px;
 }
-/* 헤더 좌측 액센트 바 — 달팽이 블루 */
+/* 헤더 좌측 액센트 바 — 버디 블루 */
 .paw {
   display: block;
   width: 4px;

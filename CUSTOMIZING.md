@@ -7,7 +7,7 @@
 
 | 구성 | 내용 | 위치 |
 | --- | --- | --- |
-| 캐릭터 애니메이션 | 스네일(달팽이) 1종 × 감정 9종 × short/long 2버전 = **JSON 18개** | [character/](character/) `snail-wide-*.json` |
+| 캐릭터 애니메이션 | **버디**(달팽이) 1종 × 감정 9종 × short/long 2버전 = **JSON 18개** | [character/](character/) `snail-wide-*.json` |
 | 미리보기 | 각 애니메이션의 첫 프레임 SVG (런타임 미사용, 에셋 선택용) | [character/](character/) `*-preview.svg` |
 | 말풍선 | JSON 픽셀 말풍선 3종(comic/purple/cozy) + 기본 SVG 생각풍선(classic) | [character/](character/) `bubble-*.json` |
 | 폰트 | MonaS12(픽셀, 기본) · Pretendard | [renderer/fonts/](renderer/fonts/) |
@@ -26,7 +26,7 @@
 | [lib/](lib/) | `config` · `anims` · `vitals` · `webhook-server` | 설정 기본값, 애셋 로드, Web Vitals 판정, 웹훅 라우팅 |
 | [preload.js](preload.js) | main ↔ renderer IPC 브릿지 | renderer에 새 기능 노출할 때 |
 | [renderer/mascot.js](renderer/mascot.js) | 캐릭터·말풍선 렌더링, `ANIM`/`BUBBLE_STYLES` 레지스트리 | 애니메이션 fps/매핑, 말풍선 스타일, 바운스 같은 코드 연출 |
-| [renderer/style.css](renderer/style.css) | 마스코트 창 스타일 (레벨 색, 흔들림, 폰트) | 말풍선 텍스트 색, urgent 연출, 새 스타일 테마 |
+| [renderer/style.css](renderer/style.css) | 버디 창 스타일 (레벨 색, 흔들림, 폰트) | 말풍선 텍스트 색, urgent 연출, 새 스타일 테마 |
 | [renderer/guide.html](renderer/guide.html) / [guide.js](renderer/guide.js) / [guide.css](renderer/guide.css) | 컨퍼런스 안내 (before/dayof/after 3상태) | 스킨, 새 카드/섹션 |
 | [renderer/help.html](renderer/help.html) / [help.js](renderer/help.js) / [help.css](renderer/help.css) | 사용 안내 (좌우로 넘기는 카드) | 안내 문구·페이지 추가 (`help.js` 의 `PAGES`) |
 | [integrations/](integrations/) | feconf · mascot-watch · mascot-dev CLI · Vite 플러그인 · 재사용 클라이언트 | 다른 툴 연동 (webpack, git hook, CI…) |
@@ -36,7 +36,7 @@
 
 ### 창/동작 스펙 (main.js 기본값)
 
-- 마스코트 창 **315×260**, 투명 · 항상 위 · 프레임 없음 · 독/작업표시줄 숨김 · 전체화면 위에도 표시. 빈 영역은 **클릭 통과**(캐릭터/말풍선 위에서만 마우스 활성).
+- 버디 창 **315×260**, 투명 · 항상 위 · 프레임 없음 · 독/작업표시줄 숨김 · 전체화면 위에도 표시. 빈 영역은 **클릭 통과**(캐릭터/말풍선 위에서만 마우스 활성).
 - 위치는 `corner` 설정(`bottom-right` 기본, 4모서리) + 걷기 시 반대 모서리로 왕복.
 - 유휴 `idleSleepMs`(기본 90초) 경과 시 잠들기. 전역 단축키 `Cmd/Ctrl+Shift+M`(숨김/표시), `Cmd/Ctrl+Shift+H`(인사).
 - 이 값들은 `config.json`으로 덮어쓸 수 있어요 (README "설정" 참고).

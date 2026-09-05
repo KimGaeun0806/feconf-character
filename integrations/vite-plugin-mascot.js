@@ -1,15 +1,15 @@
 'use strict';
 
 // ===========================================================================
-// vite-plugin-mascot — Vite 빌드/dev 서버 상태를 달팽이 마스코트로 보내기
+// vite-plugin-mascot — Vite 빌드/dev 서버 상태를 버디에게 보내기
 //
 //   // vite.config.js
 //   import mascot from './integrations/vite-plugin-mascot.js'
 //   export default { plugins: [mascot()] }
 //
 //  • dev 서버 준비됨      → "🚀 준비 완료" + 로컬 주소
-//  • 파일 저장(HMR)       → 달팽이 집중 → 잠시 후 "✅ 적용됨"
-//  • vite build 시작      → 달팽이 집중(빌드 중)
+//  • 파일 저장(HMR)       → 버디 집중 → 잠시 후 "✅ 적용됨"
+//  • vite build 시작      → 버디 집중(빌드 중)
 //  • 빌드 성공            → "✅ 빌드 완료 · N.Ns"
 //  • 빌드/컴파일 에러     → "🚨 빌드 실패" (흔들림)
 //  • Web Vitals 실측      → 완벽하면 사랑(love), 느려지면 갸웃(curious)

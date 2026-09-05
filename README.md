@@ -1,6 +1,6 @@
 # feconf-26-mascot
 
-화면 구석에 상주하는 픽셀아트 달팽이입니다.  
+화면 구석에 상주하는 FECONF 마스코트 **버디**입니다.  
 **빌드·테스트·타입체크·dev 서버** 상태를 표정과 말풍선으로 알려 주고, FECONF 일정 안내도 겸하는 Electron 데스크탑 앱입니다.
 
 앱이 꺼져 있으면 CLI·웹훅 연동은 조용히 무시합니다. 빌드나 Claude Code 작업을 막지 않습니다.
@@ -11,7 +11,7 @@
 
 ## 특징
 
-- 픽셀 마름모 달팽이 — `character/snail-wide-*.json` (파일명이 곧 감정 API)
+- **버디** — 픽셀 마름모 달팽이 캐릭터 (`character/snail-wide-*.json`, 파일명이 곧 감정 API)
 - 빌드/테스트 메이트 — `feconf-2026` / `mascot-watch` 로 아무 명령이나 감싸기
 - Web Vitals 피드백 — `feconf-2026 npm run dev` 또는 Vite 플러그인으로 LCP·INP·CLS 반응
 - 투명 · 항상 위 · 드래그 · 트레이 상주 · 빈 영역 클릭 통과
@@ -50,7 +50,7 @@ npm start
 npm i -D feconf-26-mascot
 ```
 
-마스코트를 켠 뒤:
+마스코트(버디)를 켠 뒤:
 
 ```bash
 npx feconf-2026 npm run build   # 빌드/테스트 → 시작·성공·실패 반응
@@ -165,7 +165,7 @@ node scripts/send.js state sleeping
 
 ## Claude Code 연동
 
-[Claude Code](https://claude.com/claude-code) 훅에 연결하면 작업 완료·입력 대기 때 달팽이가 알려 줍니다.
+[Claude Code](https://claude.com/claude-code) 훅에 연결하면 작업 완료·입력 대기 때 버디가 알려 줍니다.
 
 `~/.claude/settings.json`(전역) 또는 프로젝트 `.claude/settings.json`에 `hooks`만 병합하세요.
 

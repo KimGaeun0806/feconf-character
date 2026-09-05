@@ -6,11 +6,12 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const APP_NAME = 'FEConf Mascot';
+const APP_NAME = '버디'; // FECONF 마스코트 캐릭터 이름
 const BUNDLE_ID = 'org.feconf.mascot';
 const HELPER_BUNDLE_ID = `${BUNDLE_ID}.helper`;
 const OUT_DIR = path.join(ROOT, 'out');
-const BRANDED_APP = path.join(OUT_DIR, `${APP_NAME}.app`);
+// .app 경로에는 ASCII 이름을 쓴다 (표시 이름은 CFBundleDisplayName = APP_NAME)
+const BRANDED_APP = path.join(OUT_DIR, 'Buddy.app');
 const ICON_SRC = path.join(ROOT, 'assets', 'icon.icns');
 const PORT = process.env.MASCOT_PORT || 7842;
 
@@ -107,13 +108,13 @@ if (brandedApp) {
     { stdio: 'ignore' }
   );
   if (health.status === 0) {
-    console.log(`${APP_NAME} is already running on port ${PORT}.`);
+    console.log(`${APP_NAME}가 이미 실행 중이에요 (port ${PORT}).`);
     process.exit(0);
   }
 
   try {
     run('/usr/bin/open', ['-n', brandedApp, '--args', ROOT, ...process.argv.slice(2)]);
-    console.log(`${APP_NAME} launched.`);
+    console.log(`${APP_NAME}를 실행했어요.`);
     process.exit(0);
   } catch (e) {
     console.warn(`[mascot] 앱 번들 실행 실패 — Electron 으로 직접 띄웁니다: ${e.message}`);

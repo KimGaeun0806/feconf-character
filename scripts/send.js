@@ -26,7 +26,7 @@ if (kind === 'activity') {
   pathName = '/notify';
   payload = {
     title: a || '테스트 알림',
-    message: b || '마스코트 웹훅이 정상 동작합니다.',
+    message: b || '버디 웹훅이 정상 동작합니다.',
     level: c || 'info',
   };
 }

@@ -52,7 +52,7 @@ body {
 #stage {
   position: absolute;
   bottom: 8px;
-  left: 10px; /* 달팽이를 좌하단으로 */
+  left: 10px; /* 버디를 좌하단으로 */
   display: flex;
   flex-direction: column;
   align-items: flex-start;

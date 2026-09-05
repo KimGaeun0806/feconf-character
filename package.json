@@ -1,7 +1,7 @@
 {
   "name": "feconf-26-mascot",
   "version": "0.1.4",
-  "description": "Desktop pixel-art snail mascot for FE builds, tests, and Web Vitals — plus FECONF conference cues (Electron)",
+  "description": "FECONF mascot Buddy (버디) — desktop pixel-art snail for FE builds, tests, Web Vitals, and conference cues (Electron)",
   "main": "main.js",
   "bin": {
     "feconf-26-mascot": "scripts/start-branded-dev.js",

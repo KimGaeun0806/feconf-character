@@ -29,7 +29,7 @@ const { createVitalsHandler } = require('./lib/vitals');
 const { startWebhookServer } = require('./lib/webhook-server');
 
 // 트레이에 며칠씩 상주하는 앱이라 예외 하나로 통째로 죽으면 사용자는 이유도 모르고
-// 마스코트를 잃는다. 기록만 남기고 버틴다 — Node 는 처리되지 않은 rejection 도
+// 버디를 잃는다. 기록만 남기고 버틴다 — Node 는 처리되지 않은 rejection 도
 // 프로세스를 종료시키므로 둘 다 잡는다.
 process.on('uncaughtException', (e) => {
   console.error('[fatal] 처리되지 않은 예외:', (e && e.stack) || e);
@@ -40,10 +40,10 @@ process.on('unhandledRejection', (reason) => {
 
 const CONFIG = loadConfig();
 
-// 두 번째 실행은 웹훅 포트를 못 잡고 "달팽이만 있고 반응 없음"이 된다 — 한 인스턴스만 살린다.
+// 두 번째 실행은 웹훅 포트를 못 잡고 "버디만 있고 반응 없음"이 된다 — 한 인스턴스만 살린다.
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 if (!gotSingleInstanceLock) {
-  console.log(`${APP_NAME} is already running.`);
+  console.log(`${APP_NAME}가 이미 실행 중이에요.`);
   app.quit();
 }
 
@@ -230,7 +230,7 @@ function createGuideWindow() {
   });
 }
 
-// 패널은 열 때 달팽이 옆에 자리를 잡을 뿐, 그 뒤로는 달팽이가 어디로 가든 그 자리에
+// 패널은 열 때 버디 옆에 자리를 잡을 뿐, 그 뒤로는 버디가 어디로 가든 그 자리에
 // 머문다. 사용자가 헤더를 잡고 옮겼다면 다음에 열 때도 옮겨둔 자리에 뜬다 — 우리가
 // 옮긴 좌표를 기억해 두고, 그와 다른 곳으로 움직였을 때만 사용자가 끈 것으로 본다.
 let guidePinnedPos = null;
@@ -720,7 +720,7 @@ function startServer() {
       if (e && e.code === 'EADDRINUSE') {
         console.error(
           `[server] 포트 ${CONFIG.port} 이(가) 이미 사용 중입니다. ` +
-            `다른 마스코트/프로세스를 끄거나 MASCOT_PORT·config.json 의 port 를 바꾸세요.`
+            `다른 버디/프로세스를 끄거나 MASCOT_PORT·config.json 의 port 를 바꾸세요.`
         );
         app.quit();
       }
@@ -869,7 +869,7 @@ function rebuildTray() {
 
 function createTray() {
   tray = new Tray(trayIcon());
-  tray.setToolTip('컨퍼런스 마스코트');
+  tray.setToolTip('버디 · FECONF 마스코트');
   tray.setContextMenu(buildTrayMenu());
   tray.on('click', () => handleEvent('state', { state: 'greet' }));
 }
@@ -890,7 +890,7 @@ ipcMain.on('mascot:charBox', (_e, box = {}) => {
   if (ok) charBox = box;
 });
 
-// 달팽이가 화면 밖으로 나가지 못하게 — 창은 말풍선 자리까지 포함해 캐릭터보다 훨씬
+// 버디가 화면 밖으로 나가지 못하게 — 창은 말풍선 자리까지 포함해 캐릭터보다 훨씬
 // 크므로, 창이 아니라 캐릭터가 그려지는 칸이 화면 안에 남도록 잡는다. 창 모서리는
 // 투명하니 화면 밖으로 나가도 보이지 않는다.
 function clampMascotPos(x, y) {

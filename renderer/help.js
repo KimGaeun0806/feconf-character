@@ -6,8 +6,8 @@
 const PAGES = [
   {
     emoji: '🐌',
-    title: '달팽이가 왔어요',
-    lead: '화면 위에 머물면서 작업에 따라 표정이 바뀌어요.',
+    title: '버디가 왔어요',
+    lead: 'FECONF 마스코트 버디예요. 화면 위에 머물며 작업에 따라 표정이 바뀌어요.',
     rows: [
       ['클릭', '인사 + 한마디'],
       ['두 번 클릭', 'D-day 팝업'],
@@ -50,14 +50,14 @@ const PAGES = [
   {
     emoji: '🔧',
     title: '빌드에 반응해요',
-    lead: '설치 후 명령을 감싸면 표정이 바뀌어요.',
+    lead: '설치 후 명령을 감싸면 버디 표정이 바뀌어요.',
     code: 'npx feconf-2026 npm run build',
     codeLabel: '명령',
   },
   {
     emoji: '💯',
     title: '성능도 봐줘요',
-    lead: 'dev 서버를 감싸면 LCP · INP · CLS 를 재요.',
+    lead: 'dev 서버를 감싸면 버디가 LCP · INP · CLS 를 재요.',
     code: 'npx feconf-2026 npm run dev',
     codeLabel: '명령',
   },
