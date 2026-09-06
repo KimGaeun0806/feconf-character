@@ -1,9 +1,10 @@
 {
-  "name": "feconf-26-mascot",
-  "version": "0.1.4",
-  "description": "FECONF mascot Buddy (버디) — desktop pixel-art snail for FE builds, tests, Web Vitals, and conference cues (Electron)",
+  "name": "feconf2026-buddy",
+  "version": "0.1.0",
+  "description": "FECONF 2026 mascot Buddy (버디) — desktop pixel-art snail for FE builds, tests, Web Vitals, and conference cues (Electron)",
   "main": "main.js",
   "bin": {
+    "feconf2026-buddy": "scripts/start-branded-dev.js",
     "feconf-26-mascot": "scripts/start-branded-dev.js",
     "feconf-mascot": "scripts/start-branded-dev.js",
     "feconf-2026-mascot": "scripts/start-branded-dev.js",
@@ -35,14 +36,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/KimGaeun0806/feconf-character.git"
+    "url": "git+https://github.com/fedgkr/feconf2026-buddy.git"
   },
   "bugs": {
-    "url": "https://github.com/KimGaeun0806/feconf-character/issues"
+    "url": "https://github.com/fedgkr/feconf2026-buddy/issues"
   },
-  "homepage": "https://github.com/KimGaeun0806/feconf-character#readme",
+  "homepage": "https://github.com/fedgkr/feconf2026-buddy#readme",
   "keywords": [
     "feconf",
+    "buddy",
     "electron",
     "mascot",
     "desktop-pet",

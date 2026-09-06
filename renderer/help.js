@@ -13,7 +13,7 @@ const PAGES = [
       ['두 번 클릭', 'D-day 팝업'],
       ['끌기', '원하는 자리로'],
     ],
-    note: '컨퍼런스 안내는 메뉴 막대에서 열어요.',
+    note: '컨퍼런스 안내는 트레이 메뉴에서 열어요.',
   },
   {
     emoji: '📋',
@@ -22,7 +22,7 @@ const PAGES = [
     rows: [
       ['행사 전', 'D-day · 날짜 · 장소'],
       ['당일', '다음 세션까지 남은 시간'],
-      ['행사 후', '후기 남기기'],
+      ['행사 후', '감사 인사'],
     ],
   },
   {
@@ -39,10 +39,10 @@ const PAGES = [
     emoji: '🔌',
     title: '프로젝트에 연결하기',
     lead: '빌드·성능 반응을 쓰려면 프로젝트에 한 번 설치해요.',
-    code: 'npm i -D feconf-26-mascot',
+    code: 'npm i -D feconf2026-buddy',
     codeLabel: '설치',
     rows: [
-      ['앱', 'npx feconf-26-mascot'],
+      ['앱', 'npx feconf2026-buddy'],
       ['빌드', 'npx feconf-2026 npm run build'],
       ['dev', 'npx feconf-2026 npm run dev'],
     ],

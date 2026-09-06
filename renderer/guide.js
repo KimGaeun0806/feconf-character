@@ -101,7 +101,9 @@ function discordCard(conf) {
 // -------------------- 행사 전 --------------------
 function renderBefore(conf) {
   subtitleEl.textContent = '행사 준비중';
-  footerEl.textContent = '디스코드에서 미리 만나요 👋';
+  footerEl.textContent = isRealUrl(conf.discord && conf.discord.url)
+    ? '디스코드에서 미리 만나요 👋'
+    : '곧 만나요 👋';
 
   const d = ddayCount(conf);
   const hero = el('div', 'hero');
@@ -176,7 +178,9 @@ function renderDayof(conf) {
 // -------------------- 행사 후 --------------------
 function renderAfter(conf) {
   subtitleEl.textContent = '행사가 마무리됐어요';
-  footerEl.textContent = '후기 한 줄이면 큰 힘이 돼요 🙏';
+  footerEl.textContent = isRealUrl(conf.reviewUrl)
+    ? '후기 한 줄이면 큰 힘이 돼요 🙏'
+    : '함께해 주셔서 고마워요 🙏';
 
   const thanks = el('div', 'thanks');
   thanks.appendChild(el('div', 'thanks-emoji', '🎉'));

@@ -1,4 +1,4 @@
-# feconf-26-mascot
+# feconf2026-buddy
 
 화면 구석에 상주하는 FECONF 마스코트 **버디**입니다.  
 **빌드·테스트·타입체크·dev 서버** 상태를 표정과 말풍선으로 알려 주고, FECONF 일정 안내도 겸하는 Electron 데스크탑 앱입니다.
@@ -27,8 +27,10 @@
 Node.js 18+ · 첫 실행 시 Electron을 받아 1~2분 걸릴 수 있습니다.
 
 ```bash
-npx feconf-26-mascot
+npx feconf2026-buddy
 ```
+
+이전 패키지명 `feconf-26-mascot`도 같은 실행 파일로 남아 있지만, 앞으로는 `feconf2026-buddy`를 쓰세요.
 
 패키지 소스가 있는 폴더 안에서는 로컬 이름과 겹칠 수 있습니다.  
 `npx`로 받을 때는 **다른 디렉터리**에서 실행하세요.
@@ -36,8 +38,8 @@ npx feconf-26-mascot
 클론 후 로컬에서 수정할 때:
 
 ```bash
-git clone https://github.com/KimGaeun0806/feconf-character.git
-cd feconf-character
+git clone https://github.com/fedgkr/feconf2026-buddy.git
+cd feconf2026-buddy
 npm install
 npm start
 ```
@@ -47,7 +49,7 @@ npm start
 ## 프로젝트에 연결 (빌드 · 성능)
 
 ```bash
-npm i -D feconf-26-mascot
+npm i -D feconf2026-buddy
 ```
 
 마스코트(버디)를 켠 뒤:
@@ -59,10 +61,10 @@ npx feconf-2026 npm run dev     # dev 서버 → Web Vitals 피드백
 
 | 하고 싶은 일 | 명령 |
 | --- | --- |
-| 앱만 실행 | `npx feconf-26-mascot` |
+| 앱만 실행 | `npx feconf2026-buddy` |
 | 빌드·테스트 반응 | `npx feconf-2026 npm run build` |
 | 성능 피드백 | `npx feconf-2026 npm run dev` |
-| 전역 설치 후 | `npm i -g feconf-26-mascot` → `feconf-2026 …` |
+| 전역 설치 후 | `npm i -g feconf2026-buddy` → `feconf-2026 …` |
 
 동작 규칙:
 
@@ -113,7 +115,7 @@ export default {
 npm으로 설치했다면:
 
 ```js
-import mascot from 'feconf-26-mascot/integrations/vite-plugin-mascot.js';
+import mascot from 'feconf2026-buddy/integrations/vite-plugin-mascot.js';
 ```
 
 - dev 준비됨 / HMR 저장 / `vite build` 성공·실패에 반응
@@ -221,9 +223,9 @@ node scripts/send.js state sleeping
 
 | 상태 | 시점 | 내용 |
 | --- | --- | --- |
-| before | 행사 전 | D-day · 날짜 · 장소 · Discord |
+| before | 행사 전 | D-day · 날짜 · 장소 |
 | dayof | 당일 | 다음 세션 카운트다운 + 타임라인 |
-| after | 행사 후 | 감사 + 후기 링크 + Discord |
+| after | 행사 후 | 감사 (+ 후기·Discord 링크가 있으면 표시) |
 
 행사·세션은 [shared/conference.js](shared/conference.js) 한곳에서 수정합니다. `time`에는 시:분만 적고, 날짜는 `startDate`를 따릅니다.
 

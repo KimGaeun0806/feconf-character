@@ -17,11 +17,11 @@ module.exports = {
 
   // 행사 날짜 — 여기가 유일한 출처다. 이 한 줄을 고치면 D-day, 안내 패널,
   // 아래 세션들의 알림 시각까지 모두 따라온다. 하루 행사면 두 날짜를 같게 둔다.
-  startDate: '2026-10-10',
-  endDate: '2026-10-10',
+  startDate: '2026-10-24',
+  endDate: '2026-10-24',
 
-  venue: '코엑스 그랜드볼룸 (3층)',
-  address: '서울 강남구 영동대로 513',
+  venue: '롯데타워',
+  address: '서울 송파구 올림픽로 300',
 
   discord: {
     url: 'https://discord.gg/your-invite',
@@ -35,27 +35,6 @@ module.exports = {
   //   day:         여러 날 행사에서 며칠째인지 (생략하면 1일차)
   //   level:       info · success · warn · urgent(흔들림 + 오래 표시)
   // 이미 지난 세션은 예약하지 않는다.
-  sessions: [
-    {
-      time: '13:00',
-      leadMinutes: 5,
-      title: '키노트 시작 5분 전',
-      message: '메인홀에서 오프닝 키노트가 곧 시작합니다!',
-      level: 'info',
-    },
-    {
-      time: '14:30',
-      leadMinutes: 10,
-      title: 'AI 세션 안내',
-      message: "B트랙 'AI로 만드는 데스크탑 앱' 세션이 10분 뒤 시작해요.",
-      level: 'success',
-    },
-    {
-      time: '18:00',
-      leadMinutes: 0,
-      title: '네트워킹 파티 🎉',
-      message: '1층 라운지에서 네트워킹 파티가 시작됩니다!',
-      level: 'urgent',
-    },
-  ],
+  // 공식 세션표가  cond면 채워 넣는다 — 비어 있으면 안내 패널에 세션/알림이 없다.
+  sessions: [],
 };
